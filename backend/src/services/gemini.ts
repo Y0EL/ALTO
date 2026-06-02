@@ -58,7 +58,7 @@ export async function uploadAudioToGemini(args: {
       'X-Goog-Upload-Offset': '0',
       'X-Goog-Upload-Command': 'upload, finalize',
     },
-    body: uploadBody as BodyInit,
+    body: uploadBody as never,
     duplex: 'half',
   } as RequestInit & { duplex: 'half' })
 
