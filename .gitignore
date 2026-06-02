@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# env files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# build outputs
+dist/
+build/
+.next/
+.netlify/
+out/
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# fly
+.fly/
+fly.toml.bak
+
+# drizzle
+drizzle/meta/
+
+# misc
+*.tsbuildinfo
+coverage/
+
+# project agents (skill files, keep separate)
+.agents/
+skills*.json
+*.claude
