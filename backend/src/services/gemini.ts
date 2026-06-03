@@ -1,6 +1,9 @@
 import { Readable } from 'node:stream'
 import type { TranscriptPayload } from '../db/schema.js'
-import { buildTranscriptionPrompt, STRICT_RETRY_PROMPT, type Language } from '../lib/prompts.js'
+import { buildTranscriptionPrompt, buildChunkPrompt, STRICT_RETRY_PROMPT, type Language } from '../lib/prompts.js'
+
+const CHUNK_BASE_SECONDS = 10 * 60 // 10 minutes base
+const CHUNK_VARIANCE_SECONDS = 90  // +/- 1.5 minutes random variance
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com'
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
@@ -198,28 +201,200 @@ function tryParseTranscript(text: string): TranscriptPayload | null {
   }
 }
 
-export async function transcribeAudio(args: {
+function generateChunkBoundaries(totalDurationSec: number): Array<{ start: number; end: number }> {
+  const chunks: Array<{ start: number; end: number }> = []
+  let cursor = 0
+  let index = 0
+
+  while (cursor < totalDurationSec) {
+    // Random variance: -90 to +90 seconds from base 10 minutes
+    const variance = (Math.random() * 2 - 1) * CHUNK_VARIANCE_SECONDS
+    const chunkDuration = Math.max(5 * 60, CHUNK_BASE_SECONDS + variance) // min 5 minutes
+
+    const end = Math.min(cursor + chunkDuration, totalDurationSec)
+    chunks.push({ start: cursor, end })
+    cursor = end
+    index++
+  }
+
+  return chunks
+}
+
+interface ChunkTranscript {
+  segments: Array<{ start: string; end: string; speaker: string; text: string }>
+  speakerCount: number
+}
+
+function tryParseChunkTranscript(text: string): ChunkTranscript | null {
+  let candidate = text.trim()
+  const fence = candidate.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fence) candidate = fence[1].trim()
+
+  try {
+    const parsed = JSON.parse(candidate) as ChunkTranscript
+    if (!Array.isArray(parsed.segments)) return null
+    if (!parsed.segments.every((s) => typeof s.start === 'string' && typeof s.text === 'string')) {
+      return null
+    }
+    return {
+      segments: parsed.segments.map((s) => ({
+        start: s.start,
+        end: s.end ?? s.start,
+        speaker: s.speaker ?? 'Speaker 1',
+        text: s.text,
+      })),
+      speakerCount: parsed.speakerCount ?? new Set(parsed.segments.map((s) => s.speaker)).size,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function transcribeChunk(args: {
   fileUri: string
   mimeType: string
   language: Language
-}): Promise<TranscriptPayload> {
-  const prompt = buildTranscriptionPrompt(args.language)
+  chunkIndex: number
+  startSec: number
+  endSec: number
+  isLast: boolean
+}): Promise<ChunkTranscript> {
+  const prompt = buildChunkPrompt(args.language, args.chunkIndex, args.startSec, args.endSec, args.isLast)
+
   const firstText = await callGenerateContent({
     fileUri: args.fileUri,
     mimeType: args.mimeType,
     prompt,
   })
-  const first = tryParseTranscript(firstText)
+  const first = tryParseChunkTranscript(firstText)
   if (first) return first
 
-  console.warn('First Gemini response not valid JSON, retrying with stricter prompt')
+  console.warn(`Chunk ${args.chunkIndex} first response not valid JSON, retrying`)
   const retryText = await callGenerateContent({
     fileUri: args.fileUri,
     mimeType: args.mimeType,
     prompt: `${prompt}\n\n${STRICT_RETRY_PROMPT}`,
   })
-  const retry = tryParseTranscript(retryText)
+  const retry = tryParseChunkTranscript(retryText)
   if (retry) return retry
 
-  throw new Error('Gemini did not return parseable transcript JSON after retry')
+  throw new Error(`Chunk ${args.chunkIndex} did not return parseable JSON after retry`)
+}
+
+function mergeChunkTranscripts(chunks: ChunkTranscript[], language: Language): TranscriptPayload {
+  const allSegments = chunks.flatMap((c) => c.segments)
+  const uniqueSpeakers = new Set(allSegments.map((s) => s.speaker))
+
+  return {
+    segments: allSegments,
+    speakerCount: uniqueSpeakers.size,
+    summary: '', // Will be generated separately
+    language: language === 'auto' ? 'mixed' : language,
+  }
+}
+
+async function generateSummary(args: {
+  fileUri: string
+  mimeType: string
+  language: Language
+}): Promise<string> {
+  const langLabel = args.language === 'id' ? 'Indonesian' : args.language === 'en' ? 'English' : 'the same language as the audio'
+
+  const prompt = `Listen to this meeting audio and provide a summary.
+Output ONLY a JSON object with this shape (no markdown, no code fences):
+{"summary": "3-5 bullet points (each starting with '- ') of key decisions, topics, and action items"}
+
+The summary must be in ${langLabel}.
+Return ONLY the JSON object.`
+
+  try {
+    const text = await callGenerateContent({
+      fileUri: args.fileUri,
+      mimeType: args.mimeType,
+      prompt,
+    })
+
+    let candidate = text.trim()
+    const fence = candidate.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (fence) candidate = fence[1].trim()
+
+    const parsed = JSON.parse(candidate) as { summary?: string }
+    return parsed.summary ?? ''
+  } catch (err) {
+    console.warn('Failed to generate summary:', err)
+    return ''
+  }
+}
+
+export async function transcribeAudio(args: {
+  fileUri: string
+  mimeType: string
+  language: Language
+  durationSec?: number
+  onProgress?: (chunkIndex: number, totalChunks: number) => void
+}): Promise<TranscriptPayload> {
+  // If duration unknown or short (<15 min), use single-shot transcription
+  const duration = args.durationSec ?? 0
+  if (duration < 15 * 60) {
+    console.log(`Audio duration ${duration}s < 15min, using single-shot transcription`)
+    const prompt = buildTranscriptionPrompt(args.language)
+    const firstText = await callGenerateContent({
+      fileUri: args.fileUri,
+      mimeType: args.mimeType,
+      prompt,
+    })
+    const first = tryParseTranscript(firstText)
+    if (first) return first
+
+    console.warn('First Gemini response not valid JSON, retrying with stricter prompt')
+    const retryText = await callGenerateContent({
+      fileUri: args.fileUri,
+      mimeType: args.mimeType,
+      prompt: `${prompt}\n\n${STRICT_RETRY_PROMPT}`,
+    })
+    const retry = tryParseTranscript(retryText)
+    if (retry) return retry
+
+    throw new Error('Gemini did not return parseable transcript JSON after retry')
+  }
+
+  // Chunked transcription for long audio
+  console.log(`Audio duration ${duration}s, using chunked transcription`)
+  const boundaries = generateChunkBoundaries(duration)
+  console.log(`Generated ${boundaries.length} chunks:`, boundaries)
+
+  const chunkResults: ChunkTranscript[] = []
+
+  for (let i = 0; i < boundaries.length; i++) {
+    const { start, end } = boundaries[i]
+    console.log(`Processing chunk ${i + 1}/${boundaries.length}: ${start}s - ${end}s`)
+
+    args.onProgress?.(i, boundaries.length)
+
+    const chunk = await transcribeChunk({
+      fileUri: args.fileUri,
+      mimeType: args.mimeType,
+      language: args.language,
+      chunkIndex: i,
+      startSec: start,
+      endSec: end,
+      isLast: i === boundaries.length - 1,
+    })
+
+    chunkResults.push(chunk)
+    console.log(`Chunk ${i + 1} completed: ${chunk.segments.length} segments`)
+  }
+
+  // Merge all chunks
+  const merged = mergeChunkTranscripts(chunkResults, args.language)
+
+  // Generate summary separately (quick call on full audio)
+  console.log('Generating summary...')
+  merged.summary = await generateSummary({
+    fileUri: args.fileUri,
+    mimeType: args.mimeType,
+    language: args.language,
+  })
+
+  return merged
 }

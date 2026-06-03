@@ -73,6 +73,7 @@ uploadRouter.put('/:jobId', async (c) => {
     fileName: uploaded.fileName,
     mimeType: uploaded.mimeType,
     language: job.language as 'id' | 'en' | 'auto',
+    durationSec: job.durationSec ?? undefined,
   }).catch((err) => console.error('Background transcription crashed', err))
 
   return c.json({ jobId, status: 'transcribing' })
@@ -84,6 +85,7 @@ async function runTranscriptionTask(args: {
   fileName: string
   mimeType: string
   language: 'id' | 'en' | 'auto'
+  durationSec?: number
 }): Promise<void> {
   try {
     await waitForFileActive(args.fileName)
@@ -93,6 +95,11 @@ async function runTranscriptionTask(args: {
       fileUri: args.fileUri,
       mimeType: args.mimeType,
       language: args.language,
+      durationSec: args.durationSec,
+      onProgress: (chunkIndex, totalChunks) => {
+        const progress = 50 + Math.round((chunkIndex / totalChunks) * 45)
+        void cacheJobStatus(args.jobId, { status: 'transcribing', progress })
+      },
     })
 
     await db

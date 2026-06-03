@@ -34,4 +34,43 @@ Rules:
 Return ONLY the JSON object. No other text.`
 }
 
+export function buildChunkPrompt(language: Language, chunkIndex: number, startOffsetSec: number, endOffsetSec: number, isLast: boolean): string {
+  const langLabel =
+    language === 'id'
+      ? 'Indonesian (Bahasa Indonesia)'
+      : language === 'en'
+        ? 'English'
+        : 'the language spoken in the audio (auto-detect; Indonesian or English are most likely)'
+
+  const formatTime = (sec: number) => {
+    const h = Math.floor(sec / 3600)
+    const m = Math.floor((sec % 3600) / 60)
+    const s = Math.floor(sec % 60)
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  return `You are a professional meeting transcriber.
+Transcribe ONLY the portion of this audio from ${formatTime(startOffsetSec)} to ${formatTime(endOffsetSec)} in ${langLabel}.
+This is chunk ${chunkIndex + 1} of a longer recording.${isLast ? ' This is the FINAL chunk.' : ''}
+
+Output STRICT JSON ONLY with this shape:
+{
+  "segments": [
+    {"start": "MM:SS", "end": "MM:SS", "speaker": "Speaker 1", "text": "..."}
+  ],
+  "speakerCount": <integer>
+}
+
+Rules:
+- ONLY transcribe audio between ${formatTime(startOffsetSec)} and ${formatTime(endOffsetSec)}. Ignore audio outside this range.
+- Use ABSOLUTE timestamps from the original audio (not relative to chunk start).
+- Identify distinct speakers by voice. Label as "Speaker 1", "Speaker 2", etc.
+- Keep speaker labels consistent within this chunk.
+- Segment by natural speaker turns (~10-30 seconds each).
+- For Indonesian: use formal spelling. Preserve English code-switching as-is.
+- Use HH:MM:SS format if timestamps exceed 59:59, otherwise MM:SS.
+
+Return ONLY the JSON object. No other text.`
+}
+
 export const STRICT_RETRY_PROMPT = `Your previous response was not valid JSON. Return ONLY the JSON object with the exact shape specified previously. No markdown, no commentary, no code fences. Start your response with { and end with }.`
