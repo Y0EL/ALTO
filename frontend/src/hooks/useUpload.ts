@@ -29,10 +29,14 @@ export function useUpload() {
     setState({ stage: 'creating', progress: 0, jobId: null, error: null })
 
     try {
+      // Extract audio duration
+      const durationSec = await getAudioDuration(file).catch(() => undefined)
+
       const { jobId, uploadUrl } = await api.post<{ jobId: string; uploadUrl: string }>('/jobs', {
         filename: file.name,
         mimeType: file.type || guessMimeFromName(file.name),
         sizeBytes: file.size,
+        durationSec,
         language,
       })
 
@@ -92,4 +96,27 @@ function guessMimeFromName(name: string): string {
   if (ext === 'ogg') return 'audio/ogg'
   if (ext === 'flac') return 'audio/flac'
   return 'application/octet-stream'
+}
+
+function getAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio()
+    audio.preload = 'metadata'
+
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(audio.src)
+      if (audio.duration && isFinite(audio.duration)) {
+        resolve(Math.round(audio.duration))
+      } else {
+        reject(new Error('Could not determine duration'))
+      }
+    }
+
+    audio.onerror = () => {
+      URL.revokeObjectURL(audio.src)
+      reject(new Error('Failed to load audio metadata'))
+    }
+
+    audio.src = URL.createObjectURL(file)
+  })
 }

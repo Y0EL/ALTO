@@ -13,6 +13,7 @@ const createSchema = z.object({
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(1),
   sizeBytes: z.number().int().positive().max(MAX_FILE_BYTES),
+  durationSec: z.number().int().positive().optional(),
   language: z.enum(['id', 'en', 'auto']).optional(),
 })
 
@@ -42,6 +43,7 @@ jobsRouter.post('/', async (c) => {
       filename: parsed.data.filename,
       mimeType: mime,
       sizeBytes: parsed.data.sizeBytes,
+      durationSec: parsed.data.durationSec ?? null,
       language: parsed.data.language ?? 'auto',
       status: 'pending' satisfies JobStatus,
     })
