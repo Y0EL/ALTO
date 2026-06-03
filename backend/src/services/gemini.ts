@@ -1,13 +1,6 @@
 import { Readable } from 'node:stream'
-import { Agent } from 'undici'
 import type { TranscriptPayload } from '../db/schema.js'
 import { buildTranscriptionPrompt, STRICT_RETRY_PROMPT, type Language } from '../lib/prompts.js'
-
-const longTimeoutAgent = new Agent({
-  headersTimeout: 60 * 60 * 1000, // 1 hour
-  bodyTimeout: 60 * 60 * 1000,    // 1 hour
-  connectTimeout: 30 * 1000,       // 30 seconds
-})
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com'
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
@@ -143,7 +136,6 @@ async function callGenerateContent(args: {
       'Content-Type': 'application/json',
     },
     signal: controller.signal,
-    dispatcher: longTimeoutAgent as never,
     body: JSON.stringify({
       contents: [
         {

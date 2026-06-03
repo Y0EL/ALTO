@@ -1,4 +1,12 @@
 import 'dotenv/config'
+import { setGlobalDispatcher, Agent } from 'undici'
+
+setGlobalDispatcher(new Agent({
+  headersTimeout: 60 * 60 * 1000,
+  bodyTimeout: 60 * 60 * 1000,
+  connectTimeout: 30 * 1000,
+}))
+
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
