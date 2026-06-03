@@ -126,12 +126,16 @@ async function callGenerateContent(args: {
   prompt: string
 }): Promise<string> {
   const key = apiKey()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 60 * 60 * 1000) // 1 hour
+
   const res = await fetch(`${GEMINI_BASE}/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
     headers: {
       'x-goog-api-key': key,
       'Content-Type': 'application/json',
     },
+    signal: controller.signal,
     body: JSON.stringify({
       contents: [
         {
@@ -148,6 +152,8 @@ async function callGenerateContent(args: {
       },
     }),
   })
+
+  clearTimeout(timeout)
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
