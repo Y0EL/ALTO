@@ -143,7 +143,7 @@ async function callGenerateContent(args: {
       'Content-Type': 'application/json',
     },
     signal: controller.signal,
-    dispatcher: longTimeoutAgent,
+    dispatcher: longTimeoutAgent as never,
     body: JSON.stringify({
       contents: [
         {
