@@ -331,7 +331,7 @@ export async function transcribeAudio(args: {
   mimeType: string
   language: Language
   durationSec?: number
-  onProgress?: (chunkIndex: number, totalChunks: number) => void
+  onChunkComplete?: (partialTranscript: TranscriptPayload, chunkIndex: number, totalChunks: number) => Promise<void>
 }): Promise<TranscriptPayload> {
   // If duration unknown or short (<15 min), use single-shot transcription
   const duration = args.durationSec ?? 0
@@ -369,8 +369,6 @@ export async function transcribeAudio(args: {
     const { start, end } = boundaries[i]
     console.log(`Processing chunk ${i + 1}/${boundaries.length}: ${start}s - ${end}s`)
 
-    args.onProgress?.(i, boundaries.length)
-
     const chunk = await transcribeChunk({
       fileUri: args.fileUri,
       mimeType: args.mimeType,
@@ -383,9 +381,13 @@ export async function transcribeAudio(args: {
 
     chunkResults.push(chunk)
     console.log(`Chunk ${i + 1} completed: ${chunk.segments.length} segments`)
+
+    // Build and save partial transcript after each chunk
+    const partial = mergeChunkTranscripts(chunkResults, args.language)
+    await args.onChunkComplete?.(partial, i, boundaries.length)
   }
 
-  // Merge all chunks
+  // Final merged result
   const merged = mergeChunkTranscripts(chunkResults, args.language)
 
   // Generate summary separately (quick call on full audio)

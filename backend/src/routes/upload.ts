@@ -96,9 +96,14 @@ async function runTranscriptionTask(args: {
       mimeType: args.mimeType,
       language: args.language,
       durationSec: args.durationSec,
-      onProgress: (chunkIndex, totalChunks) => {
-        const progress = 50 + Math.round((chunkIndex / totalChunks) * 45)
-        void cacheJobStatus(args.jobId, { status: 'transcribing', progress })
+      onChunkComplete: async (partialTranscript, chunkIndex, totalChunks) => {
+        const progress = 50 + Math.round(((chunkIndex + 1) / totalChunks) * 45)
+        // Save partial transcript to DB so frontend can display progress
+        await db
+          .update(jobs)
+          .set({ transcript: partialTranscript })
+          .where(eq(jobs.id, args.jobId))
+        await cacheJobStatus(args.jobId, { status: 'transcribing', progress })
       },
     })
 

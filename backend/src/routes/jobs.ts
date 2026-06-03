@@ -91,14 +91,6 @@ jobsRouter.get('/:id', async (c) => {
   const user = c.get('user')
   const id = c.req.param('id')
 
-  const cached = await getCachedJobStatus(id)
-  if (cached && typeof cached === 'object' && 'status' in cached) {
-    const status = (cached as { status: string }).status
-    if (status !== 'completed' && status !== 'failed') {
-      return c.json({ id, ...cached })
-    }
-  }
-
   const [job] = await db
     .select()
     .from(jobs)
@@ -106,6 +98,15 @@ jobsRouter.get('/:id', async (c) => {
     .limit(1)
 
   if (!job) return c.json({ error: 'Job tidak ditemukan' }, 404)
+
+  // Get progress from cache for in-progress jobs
+  let progress: number | undefined
+  if (job.status !== 'completed' && job.status !== 'failed') {
+    const cached = await getCachedJobStatus(id)
+    if (cached && typeof cached === 'object' && 'progress' in cached) {
+      progress = (cached as { progress?: number }).progress
+    }
+  }
 
   return c.json({
     id: job.id,
@@ -115,6 +116,7 @@ jobsRouter.get('/:id', async (c) => {
     durationSec: job.durationSec,
     language: job.language,
     status: job.status,
+    progress,
     transcript: job.transcript,
     error: job.errorMessage,
     createdAt: job.createdAt,

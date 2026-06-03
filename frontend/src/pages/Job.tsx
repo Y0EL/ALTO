@@ -131,6 +131,35 @@ export default function Job() {
               Hapus dari riwayat
             </button>
           </div>
+        ) : job.status === 'transcribing' && job.transcript?.segments?.length ? (
+          <div>
+            <div className="card p-4 mb-4 flex items-center gap-3 bg-amber-50 border-amber-200">
+              <div className="flex items-end gap-0.5 h-5">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="w-1 bg-amber-500 rounded-full animate-pulse-ring"
+                    style={{
+                      animationDelay: `${i * 120}ms`,
+                      height: `${10 + (i % 3) * 6}px`,
+                    }}
+                  />
+                ))}
+              </div>
+              <p className="text-sm text-amber-800">
+                ALTO sedang mendengarkan... ({job.transcript.segments.length} segmen sejauh ini)
+              </p>
+              <button
+                onClick={() => handleDelete()}
+                disabled={deleting}
+                className="ml-auto inline-flex items-center gap-1 text-xs text-amber-700 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50"
+              >
+                <XCircle size={14} />
+                Batalkan
+              </button>
+            </div>
+            <TranscriptViewer transcript={job.transcript} filename={job.filename} isPartial />
+          </div>
         ) : (
           <div className="card p-12 text-center">
             <div className="flex items-end justify-center gap-1 h-10 mb-4">

@@ -7,9 +7,10 @@ import { speakerColor, parseTimestamp } from '../lib/format'
 interface Props {
   transcript: TranscriptPayload
   filename: string
+  isPartial?: boolean
 }
 
-export function TranscriptViewer({ transcript, filename }: Props) {
+export function TranscriptViewer({ transcript, filename, isPartial }: Props) {
   const [query, setQuery] = useState('')
   const [copied, setCopied] = useState<'all' | 'segment' | null>(null)
 
