@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { jobs, type JobStatus, type TranscriptPayload } from '../db/schema.js'
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
-import { transcribeWithOpenAI } from '../services/openai.js'
+import { transcribeWithDeepgram } from '../services/deepgram.js'
 import { cacheJobStatus } from '../services/redis.js'
 
 export const uploadRouter = new Hono<AppEnv>()
@@ -78,7 +78,7 @@ async function runTranscriptionTask(args: {
   language: 'id' | 'en' | 'auto'
 }): Promise<void> {
   try {
-    const transcript: TranscriptPayload = await transcribeWithOpenAI({
+    const transcript: TranscriptPayload = await transcribeWithDeepgram({
       buffer: args.buffer,
       mimeType: args.mimeType,
       language: args.language,
