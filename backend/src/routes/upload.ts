@@ -3,11 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { jobs, type JobStatus, type TranscriptPayload } from '../db/schema.js'
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
-import {
-  transcribeAudio,
-  uploadAudioToGemini,
-  waitForFileActive,
-} from '../services/gemini.js'
+import { transcribeWithOpenAI } from '../services/openai.js'
 import { cacheJobStatus } from '../services/redis.js'
 
 export const uploadRouter = new Hono<AppEnv>()
@@ -36,44 +32,40 @@ uploadRouter.put('/:jobId', async (c) => {
   if (!sizeBytes) return c.json({ error: 'Content-Length missing' }, 411)
 
   await db.update(jobs).set({ status: 'uploading' satisfies JobStatus }).where(eq(jobs.id, jobId))
-  await cacheJobStatus(jobId, { status: 'uploading', progress: 0 })
+  await cacheJobStatus(jobId, { status: 'uploading', progress: 10 })
 
-  let uploaded
+  // Buffer the audio in memory
+  let buffer: Buffer
   try {
-    uploaded = await uploadAudioToGemini({
-      body,
-      mimeType: job.mimeType,
-      sizeBytes,
-      displayName: job.filename,
-    })
+    const chunks: Uint8Array[] = []
+    const reader = body.getReader()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+    }
+    buffer = Buffer.concat(chunks)
   } catch (err) {
-    console.error('Gemini upload failed', err)
     const msg = err instanceof Error ? err.message : String(err)
     await db
       .update(jobs)
       .set({ status: 'failed' satisfies JobStatus, errorMessage: `Upload gagal: ${msg}` })
       .where(eq(jobs.id, jobId))
     await cacheJobStatus(jobId, { status: 'failed', error: msg })
-    return c.json({ error: 'Upload ke Gemini gagal', detail: msg }, 502)
+    return c.json({ error: 'Gagal membaca upload', detail: msg }, 502)
   }
 
   await db
     .update(jobs)
-    .set({
-      status: 'transcribing' satisfies JobStatus,
-      geminiFileUri: uploaded.fileUri,
-      geminiFileName: uploaded.fileName,
-    })
+    .set({ status: 'transcribing' satisfies JobStatus })
     .where(eq(jobs.id, jobId))
   await cacheJobStatus(jobId, { status: 'transcribing', progress: 30 })
 
   void runTranscriptionTask({
     jobId,
-    fileUri: uploaded.fileUri,
-    fileName: uploaded.fileName,
-    mimeType: uploaded.mimeType,
+    buffer,
+    mimeType: job.mimeType,
     language: job.language as 'id' | 'en' | 'auto',
-    durationSec: job.durationSec ?? undefined,
   }).catch((err) => console.error('Background transcription crashed', err))
 
   return c.json({ jobId, status: 'transcribing' })
@@ -81,28 +73,23 @@ uploadRouter.put('/:jobId', async (c) => {
 
 async function runTranscriptionTask(args: {
   jobId: string
-  fileUri: string
-  fileName: string
+  buffer: Buffer
   mimeType: string
   language: 'id' | 'en' | 'auto'
-  durationSec?: number
 }): Promise<void> {
   try {
-    await waitForFileActive(args.fileName)
-    await cacheJobStatus(args.jobId, { status: 'transcribing', progress: 50 })
-
-    const transcript: TranscriptPayload = await transcribeAudio({
-      fileUri: args.fileUri,
+    const transcript: TranscriptPayload = await transcribeWithOpenAI({
+      buffer: args.buffer,
       mimeType: args.mimeType,
       language: args.language,
-      durationSec: args.durationSec,
-      onChunkComplete: async (partialTranscript, chunkIndex, totalChunks) => {
-        const progress = 50 + Math.round(((chunkIndex + 1) / totalChunks) * 45)
-        // Save partial transcript to DB so frontend can display progress
-        await db
-          .update(jobs)
-          .set({ transcript: partialTranscript })
-          .where(eq(jobs.id, args.jobId))
+      onProgress: async (step) => {
+        console.log(`[${args.jobId}] ${step}`)
+        const progressMap: Record<string, number> = {
+          'Compressing audio...': 35,
+          'Transcribing audio...': 50,
+          'Adding speaker labels and summary...': 85,
+        }
+        const progress = progressMap[step] ?? 50
         await cacheJobStatus(args.jobId, { status: 'transcribing', progress })
       },
     })

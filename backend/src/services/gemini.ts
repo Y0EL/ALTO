@@ -127,51 +127,75 @@ async function callGenerateContent(args: {
   fileUri: string
   mimeType: string
   prompt: string
+  maxRetries?: number
 }): Promise<string> {
   const key = apiKey()
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60 * 60 * 1000) // 1 hour
+  const maxRetries = args.maxRetries ?? 3
 
-  const res = await fetch(`${GEMINI_BASE}/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: {
-      'x-goog-api-key': key,
-      'Content-Type': 'application/json',
-    },
-    signal: controller.signal,
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { text: args.prompt },
-            { file_data: { mime_type: args.mimeType, file_uri: args.fileUri } },
-          ],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-        maxOutputTokens: 65536,
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 60 * 60 * 1000) // 1 hour
+
+    const res = await fetch(`${GEMINI_BASE}/v1beta/models/${MODEL}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': key,
+        'Content-Type': 'application/json',
       },
-    }),
-  })
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: args.prompt },
+              { file_data: { mime_type: args.mimeType, file_uri: args.fileUri } },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+          maxOutputTokens: 65536,
+        },
+      }),
+    })
 
-  clearTimeout(timeout)
+    clearTimeout(timeout)
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Gemini generateContent failed (${res.status}): ${text}`)
+    // Handle rate limit (429)
+    if (res.status === 429 && attempt < maxRetries) {
+      const body = await res.json().catch(() => ({})) as { error?: { details?: Array<{ retryDelay?: string }> } }
+      const retryDelay = body.error?.details?.find((d) => d.retryDelay)?.retryDelay
+      const waitMs = retryDelay ? parseRetryDelay(retryDelay) : (attempt + 1) * 60_000
+      console.warn(`Rate limited, waiting ${Math.round(waitMs / 1000)}s before retry ${attempt + 1}/${maxRetries}`)
+      await new Promise((r) => setTimeout(r, waitMs))
+      continue
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Gemini generateContent failed (${res.status}): ${text}`)
+    }
+
+    const data = (await res.json()) as GenerateContentResponse
+
+    if (data.promptFeedback?.blockReason) {
+      throw new Error(`Gemini blocked content: ${data.promptFeedback.blockReason}`)
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? ''
+    if (!text) throw new Error('Gemini returned empty response')
+    return text
   }
 
-  const data = (await res.json()) as GenerateContentResponse
+  throw new Error('Gemini rate limit exceeded after max retries')
+}
 
-  if (data.promptFeedback?.blockReason) {
-    throw new Error(`Gemini blocked content: ${data.promptFeedback.blockReason}`)
-  }
-
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? ''
-  if (!text) throw new Error('Gemini returned empty response')
-  return text
+function parseRetryDelay(delay: string): number {
+  // Parse "36s" or "36.754157293s" format
+  const match = delay.match(/^([\d.]+)s$/)
+  if (match) return Math.ceil(parseFloat(match[1]) * 1000) + 1000 // Add 1s buffer
+  return 60_000 // Default 1 minute
 }
 
 function tryParseTranscript(text: string): TranscriptPayload | null {
