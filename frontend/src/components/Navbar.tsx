@@ -1,13 +1,11 @@
-import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { SignOut, ShieldStar, List, X } from '@phosphor-icons/react'
+import { SignOut, ShieldStar } from '@phosphor-icons/react'
 import { useAuth } from '../hooks/useAuth'
 
 export function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [open, setOpen] = useState(false)
 
   if (!user) return null
 
@@ -48,50 +46,7 @@ export function Navbar() {
             Keluar
           </button>
         </nav>
-
-        <button
-          className="md:hidden grid place-items-center w-10 h-10 rounded-full hover:bg-zinc-100"
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Toggle menu"
-        >
-          {open ? <X size={20} /> : <List size={20} />}
-        </button>
       </div>
-
-      {open && (
-        <div className="md:hidden border-t border-zinc-200 bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-1">
-            <div className="px-2 py-2 text-sm text-zinc-500">
-              {user.username}
-              {user.isAdmin && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-white tracking-wide">
-                  admin
-                </span>
-              )}
-            </div>
-            {user.isAdmin && (
-              <Link
-                to="/admin"
-                onClick={() => setOpen(false)}
-                className="px-3 py-3 rounded-xl text-sm font-medium hover:bg-zinc-100 flex items-center gap-2"
-              >
-                <ShieldStar weight="bold" size={16} />
-                Manajemen User
-              </Link>
-            )}
-            <button
-              onClick={() => {
-                setOpen(false)
-                void handleLogout()
-              }}
-              className="text-left px-3 py-3 rounded-xl text-sm font-medium text-red-700 hover:bg-red-50 flex items-center gap-2"
-            >
-              <SignOut weight="bold" size={16} />
-              Keluar
-            </button>
-          </div>
-        </div>
-      )}
     </header>
   )
 }
