@@ -4,13 +4,16 @@ import { join } from 'node:path'
 import { execFile, execSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import OpenAI from 'openai'
+import type { TranscriptPayload, TranscriptSegment } from '../db/schema.js'
+import type { Language } from '../lib/prompts.js'
 
 const execFileAsync = promisify(execFile)
-import type { TranscriptPayload } from '../db/schema.js'
-import type { Language } from '../lib/prompts.js'
 
 const MAX_WHISPER_BYTES = 24 * 1024 * 1024 // 24MB
 const CHUNK_MINUTES = 10
+const DIARIZE_BATCH_SIZE = 100
+const MERGE_MAX_GAP_SEC = 1.5
+const MERGE_MAX_DURATION_SEC = 25
 
 function client(): OpenAI {
   const key = process.env.OPENAI_API_KEY
@@ -53,7 +56,6 @@ function getExt(mimeType: string): string {
   return map[mimeType] ?? 'mp3'
 }
 
-// Compress to mono 16kHz 32kbps mp3 - good enough for speech, ~14MB/hour
 async function compressToSpeech(inputPath: string): Promise<string> {
   const outputPath = join(tmpdir(), `alto-compressed-${Date.now()}.mp3`)
   await execFileAsync('ffmpeg', [
@@ -64,7 +66,6 @@ async function compressToSpeech(inputPath: string): Promise<string> {
   return outputPath
 }
 
-// Split audio into chunks of ~CHUNK_MINUTES minutes
 async function splitAudio(inputPath: string, durationSec: number): Promise<string[]> {
   const chunkPaths: string[] = []
   const chunkSec = CHUNK_MINUTES * 60
@@ -113,6 +114,32 @@ async function runWhisper(filePath: string, language: Language, offsetSec = 0): 
   }))
 }
 
+// Merge over-granular Whisper segments into natural speech units (~25s max)
+// Stops merging on significant silence gaps (likely speaker changes)
+function mergeWhisperSegments(segments: WhisperSegment[]): WhisperSegment[] {
+  if (segments.length === 0) return []
+
+  const merged: WhisperSegment[] = []
+  let current = { ...segments[0] }
+
+  for (let i = 1; i < segments.length; i++) {
+    const next = segments[i]
+    const gap = next.start - current.end
+    const currentDuration = current.end - current.start
+
+    if (gap <= MERGE_MAX_GAP_SEC && currentDuration < MERGE_MAX_DURATION_SEC) {
+      current.end = next.end
+      current.text = current.text + ' ' + next.text
+    } else {
+      merged.push(current)
+      current = { ...next }
+    }
+  }
+  merged.push(current)
+
+  return merged
+}
+
 function formatTimestamp(sec: number): string {
   const h = Math.floor(sec / 3600)
   const m = Math.floor((sec % 3600) / 60)
@@ -121,10 +148,12 @@ function formatTimestamp(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-async function diarizeAndSummarize(
+// Diarize one batch of segments, carrying over speaker context from previous batches
+async function diarizeBatch(
   segments: WhisperSegment[],
-  language: Language
-): Promise<TranscriptPayload> {
+  language: Language,
+  speakerContext: string
+): Promise<{ diarized: TranscriptSegment[]; speakerContext: string }> {
   const openai = client()
 
   const rawTranscript = segments
@@ -132,30 +161,33 @@ async function diarizeAndSummarize(
     .join('\n')
 
   const langLabel =
-    language === 'id' ? 'Indonesian' : language === 'en' ? 'English' : 'auto-detect'
+    language === 'id' ? 'Indonesian' : language === 'en' ? 'English' : 'the same language as the transcript'
+
+  const contextNote = speakerContext
+    ? `\n\nSpeakers identified so far:\n${speakerContext}\nUSE THE SAME SPEAKER LABELS for the same voices.`
+    : ''
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     response_format: { type: 'json_object' },
     temperature: 0.1,
+    max_tokens: 16000,
     messages: [
       {
         role: 'system',
-        content: `You are a meeting transcript processor. Given a raw transcript with timestamps, add speaker diarization and generate a summary.
+        content: `You are a meeting transcript processor. Add speaker diarization to this transcript segment.${contextNote}
 
-Output STRICT JSON with this shape:
+Output STRICT JSON:
 {
   "segments": [{"start": "MM:SS", "end": "MM:SS", "speaker": "Speaker 1", "text": "..."}],
-  "speakerCount": <integer>,
-  "summary": "3-5 bullet points starting with '- '",
-  "language": "id" | "en" | "mixed"
+  "speakerSummary": "Speaker 1: [brief voice description], Speaker 2: [brief voice description]"
 }
 
 Rules:
-- Infer speaker changes from context (topic shifts, conversation flow, question/answer patterns)
-- Label speakers as "Speaker 1", "Speaker 2", etc. consistently
-- Keep original timestamps
-- Summary must be in ${langLabel === 'auto-detect' ? 'the same language as the transcript' : langLabel}
+- Infer speaker changes from context (topic shifts, Q&A patterns, conversation flow)
+- Label as "Speaker 1", "Speaker 2", etc. Keep labels consistent${contextNote ? ' with provided context' : ''}
+- Keep original timestamps exactly
+- speakerSummary: short description of each speaker's characteristics for context carry-over
 - Return ONLY the JSON object`,
       },
       {
@@ -166,20 +198,82 @@ Rules:
   })
 
   const text = response.choices[0]?.message?.content ?? ''
-  const parsed = JSON.parse(text) as TranscriptPayload
+  const parsed = JSON.parse(text) as {
+    segments: TranscriptSegment[]
+    speakerSummary?: string
+  }
 
-  if (!Array.isArray(parsed.segments)) throw new Error('GPT-4o returned invalid structure')
+  if (!Array.isArray(parsed.segments)) throw new Error('GPT returned invalid structure in batch')
+
+  const diarized = parsed.segments.map((s) => ({
+    start: s.start,
+    end: s.end ?? s.start,
+    speaker: s.speaker ?? 'Speaker 1',
+    text: s.text,
+  }))
 
   return {
-    segments: parsed.segments.map((s) => ({
-      start: s.start,
-      end: s.end ?? s.start,
-      speaker: s.speaker ?? 'Speaker 1',
-      text: s.text,
-    })),
-    speakerCount: parsed.speakerCount ?? new Set(parsed.segments.map((s) => s.speaker)).size,
-    summary: parsed.summary ?? '',
-    language: parsed.language ?? 'mixed',
+    diarized,
+    speakerContext: parsed.speakerSummary ?? speakerContext,
+  }
+}
+
+async function diarizeInBatches(
+  segments: WhisperSegment[],
+  language: Language
+): Promise<TranscriptSegment[]> {
+  const allDiarized: TranscriptSegment[] = []
+  let speakerContext = ''
+  const totalBatches = Math.ceil(segments.length / DIARIZE_BATCH_SIZE)
+
+  console.log(`Diarizing ${segments.length} segments in ${totalBatches} batches`)
+
+  for (let i = 0; i < segments.length; i += DIARIZE_BATCH_SIZE) {
+    const batch = segments.slice(i, i + DIARIZE_BATCH_SIZE)
+    const batchNum = Math.floor(i / DIARIZE_BATCH_SIZE) + 1
+    console.log(`Diarizing batch ${batchNum}/${totalBatches} (${batch.length} segments)`)
+
+    const { diarized, speakerContext: newContext } = await diarizeBatch(batch, language, speakerContext)
+    allDiarized.push(...diarized)
+    speakerContext = newContext
+  }
+
+  return allDiarized
+}
+
+async function generateSummary(segments: TranscriptSegment[], language: Language): Promise<string> {
+  const openai = client()
+
+  const langLabel =
+    language === 'id' ? 'Indonesian' : language === 'en' ? 'English' : 'the same language as the transcript'
+
+  // Condense transcript to plain text for summary (no timestamps needed)
+  const plainText = segments
+    .map((s) => `${s.speaker}: ${s.text}`)
+    .join('\n')
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    response_format: { type: 'json_object' },
+    temperature: 0.2,
+    messages: [
+      {
+        role: 'system',
+        content: `Summarize this meeting transcript. Output JSON: {"summary": "3-5 bullet points starting with '- '"}. Summary must be in ${langLabel}. Return ONLY the JSON object.`,
+      },
+      {
+        role: 'user',
+        content: plainText.slice(0, 60000), // cap input to avoid token limit
+      },
+    ],
+  })
+
+  const text = response.choices[0]?.message?.content ?? ''
+  try {
+    const parsed = JSON.parse(text) as { summary?: string }
+    return parsed.summary ?? ''
+  } catch {
+    return ''
   }
 }
 
@@ -196,7 +290,6 @@ export async function transcribeWithOpenAI(args: {
   try {
     if (!hasFfmpeg()) throw new Error('ffmpeg not available on this server')
 
-    // Always compress first for consistent format + smaller size
     args.onProgress?.('Compressing audio...')
     console.log(`Original size: ${Math.round(args.buffer.length / 1024 / 1024)}MB`)
     const compressedPath = await compressToSpeech(tmpPath)
@@ -205,16 +298,14 @@ export async function transcribeWithOpenAI(args: {
     const compressedSize = statSync(compressedPath).size
     console.log(`Compressed to ${Math.round(compressedSize / 1024 / 1024)}MB`)
 
-    let allSegments: WhisperSegment[] = []
+    let rawSegments: WhisperSegment[] = []
 
     if (compressedSize <= MAX_WHISPER_BYTES) {
-      // Single file, send directly
       args.onProgress?.('Transcribing audio...')
       console.log('Single-shot Whisper transcription')
-      allSegments = await runWhisper(compressedPath, args.language)
-      console.log(`Whisper returned ${allSegments.length} segments`)
+      rawSegments = await runWhisper(compressedPath, args.language)
+      console.log(`Whisper returned ${rawSegments.length} raw segments`)
     } else {
-      // Too large even after compression → split into chunks
       const durationSec = await getAudioDuration(compressedPath)
       const totalChunks = Math.ceil(durationSec / (CHUNK_MINUTES * 60))
       console.log(`Audio ${Math.round(durationSec / 60)}min → splitting into ${totalChunks} chunks`)
@@ -226,19 +317,36 @@ export async function transcribeWithOpenAI(args: {
         const offsetSec = i * CHUNK_MINUTES * 60
         args.onProgress?.(`Transcribing chunk ${i + 1}/${chunkPaths.length}...`)
         console.log(`Chunk ${i + 1}/${chunkPaths.length} (offset ${offsetSec}s)`)
-
         const chunkSegments = await runWhisper(chunkPaths[i], args.language, offsetSec)
-        allSegments.push(...chunkSegments)
+        rawSegments.push(...chunkSegments)
         console.log(`Chunk ${i + 1} done: ${chunkSegments.length} segments`)
       }
+      console.log(`Total raw segments: ${rawSegments.length}`)
     }
 
-    args.onProgress?.('Adding speaker labels and summary...')
-    console.log(`Total segments: ${allSegments.length}, running diarization...`)
-    const result = await diarizeAndSummarize(allSegments, args.language)
-    console.log(`Done: ${result.segments.length} segments, ${result.speakerCount} speakers`)
+    // Merge over-granular Whisper segments before diarization
+    const mergedSegments = mergeWhisperSegments(rawSegments)
+    console.log(`After merge: ${rawSegments.length} → ${mergedSegments.length} segments`)
 
-    return result
+    // Diarize in batches to stay within GPT output token limits
+    args.onProgress?.('Adding speaker labels...')
+    const diarizedSegments = await diarizeInBatches(mergedSegments, args.language)
+
+    // Generate summary separately
+    args.onProgress?.('Generating summary...')
+    const summary = await generateSummary(diarizedSegments, args.language)
+
+    const uniqueSpeakers = new Set(diarizedSegments.map((s) => s.speaker))
+    const detectedLang = args.language === 'auto' ? 'mixed' : args.language
+
+    console.log(`Done: ${diarizedSegments.length} segments, ${uniqueSpeakers.size} speakers`)
+
+    return {
+      segments: diarizedSegments,
+      speakerCount: uniqueSpeakers.size,
+      summary,
+      language: detectedLang,
+    }
   } finally {
     for (const f of tempFiles) {
       try { if (existsSync(f)) unlinkSync(f) } catch {}
