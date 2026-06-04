@@ -16,6 +16,9 @@ import { authRouter } from './routes/auth.js'
 import { usersRouter } from './routes/users.js'
 import { jobsRouter } from './routes/jobs.js'
 import { uploadRouter } from './routes/upload.js'
+import { db } from './db/client.js'
+import { jobs } from './db/schema.js'
+import { inArray } from 'drizzle-orm'
 
 const app = new Hono<AppEnv>()
 
@@ -55,7 +58,29 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal server error', message: err.message }, 500)
 })
 
+// On startup: mark any stuck jobs as failed (machine restart mid-transcription)
+async function recoverStuckJobs() {
+  try {
+    const stuck = await db
+      .update(jobs)
+      .set({
+        status: 'failed',
+        errorMessage: 'Server restart saat proses berlangsung. Silakan upload ulang.',
+      })
+      .where(inArray(jobs.status, ['transcribing', 'uploading']))
+      .returning({ id: jobs.id })
+
+    if (stuck.length > 0) {
+      console.log(`Marked ${stuck.length} stuck job(s) as failed:`, stuck.map((j) => j.id))
+    }
+  } catch (err) {
+    console.error('Failed to recover stuck jobs:', err)
+  }
+}
+
 const port = Number(process.env.PORT ?? 3000)
 console.log(`Backend listening on http://localhost:${port}`)
 
 serve({ fetch: app.fetch, port })
+
+recoverStuckJobs()
