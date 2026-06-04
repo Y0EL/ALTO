@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-192.svg', 'icon-512.svg'],
       manifest: {
-        name: 'ALTO – Transkrip Meeting',
+        name: 'ALTO',
         short_name: 'ALTO',
-        description: 'Transkrip meeting panjang ke teks terstruktur dengan label pembicara',
+        description: 'Transkrip meeting dengan label pembicara',
         theme_color: '#0a0a0b',
         background_color: '#ffffff',
         display: 'standalone',

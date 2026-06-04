@@ -67,7 +67,7 @@ export function BottomNav() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="md:hidden fixed inset-0 z-30 bg-black/20"
+              className="md:hidden fixed inset-0 z-[45] bg-black/20"
               onClick={() => setProfileOpen(false)}
             />
             <motion.div
@@ -146,10 +146,17 @@ function NavTab({
   return (
     <button
       onClick={onClick}
-      className="flex-1 flex flex-col items-center justify-center gap-1 transition-colors"
+      className="flex-1 flex flex-col items-center justify-center gap-1 relative pt-1 transition-colors"
     >
-      <span className={active ? 'text-ink' : 'text-zinc-400'}>{icon}</span>
-      <span className={`text-[10px] font-medium ${active ? 'text-ink' : 'text-zinc-400'}`}>
+      {active && (
+        <motion.div
+          layoutId="tab-indicator"
+          className="absolute top-0 w-8 h-[3px] rounded-full bg-ink"
+          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+        />
+      )}
+      <span className={`transition-colors ${active ? 'text-ink' : 'text-zinc-400'}`}>{icon}</span>
+      <span className={`text-[10px] font-medium transition-colors ${active ? 'text-ink' : 'text-zinc-400'}`}>
         {label}
       </span>
     </button>

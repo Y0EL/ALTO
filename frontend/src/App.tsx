@@ -1,14 +1,23 @@
 import { useLocation, Route, Routes } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AuthProvider } from './hooks/useAuth'
+import { AuthProvider, useAuth } from './hooks/useAuth'
 import { Navbar } from './components/Navbar'
 import { BottomNav } from './components/BottomNav'
 import { InstallBanner } from './components/InstallBanner'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { LoadingScreen } from './components/LoadingScreen'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import Home from './pages/Home'
 import Job from './pages/Job'
 import Admin from './pages/Admin'
+
+function RootPage() {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!user) return <Landing />
+  return <Home />
+}
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -23,8 +32,16 @@ function AnimatedRoutes() {
         style={{ minHeight: '100%' }}
       >
         <Routes location={location}>
-          <Route path="/" element={<Home />} />
-          <Route path="/job/:id" element={<Job />} />
+          <Route path="/" element={<RootPage />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/job/:id"
+            element={
+              <ProtectedRoute>
+                <Job />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin"
             element={
@@ -33,7 +50,7 @@ function AnimatedRoutes() {
               </ProtectedRoute>
             }
           />
-          <Route path="*" element={<Home />} />
+          <Route path="*" element={<RootPage />} />
         </Routes>
       </motion.div>
     </AnimatePresence>
@@ -43,22 +60,10 @@ function AnimatedRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="*"
-          element={
-            <ProtectedRoute>
-              <>
-                <InstallBanner />
-                <Navbar />
-                <AnimatedRoutes />
-                <BottomNav />
-              </>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+      <InstallBanner />
+      <Navbar />
+      <AnimatedRoutes />
+      <BottomNav />
     </AuthProvider>
   )
 }
