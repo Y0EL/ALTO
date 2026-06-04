@@ -1,12 +1,16 @@
 import { createReadStream, writeFileSync, unlinkSync, existsSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { execSync } from 'node:child_process'
+import { execFile, execSync } from 'node:child_process'
+import { promisify } from 'node:util'
 import OpenAI from 'openai'
+
+const execFileAsync = promisify(execFile)
 import type { TranscriptPayload } from '../db/schema.js'
 import type { Language } from '../lib/prompts.js'
 
-const MAX_WHISPER_BYTES = 24 * 1024 * 1024 // 24MB (Whisper limit is 25MB)
+const MAX_WHISPER_BYTES = 24 * 1024 * 1024 // 24MB
+const CHUNK_MINUTES = 10
 
 function client(): OpenAI {
   const key = process.env.OPENAI_API_KEY
@@ -23,16 +27,17 @@ function hasFfmpeg(): boolean {
   }
 }
 
-async function compressAudio(inputPath: string): Promise<string> {
-  const outputPath = join(tmpdir(), `alto-compressed-${Date.now()}.mp3`)
-  execSync(`ffmpeg -i "${inputPath}" -vn -ar 16000 -ac 1 -b:a 32k "${outputPath}" -y`, {
-    stdio: 'ignore',
-    timeout: 10 * 60 * 1000,
-  })
-  return outputPath
+async function getAudioDuration(filePath: string): Promise<number> {
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v', 'error',
+    '-show_entries', 'format=duration',
+    '-of', 'csv=p=0',
+    filePath,
+  ], { timeout: 30_000 })
+  return parseFloat(stdout.trim()) || 0
 }
 
-async function writeBufferToTmp(buffer: Buffer, ext: string): Promise<string> {
+function writeBufferToTmp(buffer: Buffer, ext: string): string {
   const path = join(tmpdir(), `alto-upload-${Date.now()}.${ext}`)
   writeFileSync(path, buffer)
   return path
@@ -48,13 +53,48 @@ function getExt(mimeType: string): string {
   return map[mimeType] ?? 'mp3'
 }
 
+// Compress to mono 16kHz 32kbps mp3 - good enough for speech, ~14MB/hour
+async function compressToSpeech(inputPath: string): Promise<string> {
+  const outputPath = join(tmpdir(), `alto-compressed-${Date.now()}.mp3`)
+  await execFileAsync('ffmpeg', [
+    '-i', inputPath,
+    '-vn', '-ar', '16000', '-ac', '1', '-b:a', '32k',
+    outputPath, '-y',
+  ], { timeout: 10 * 60 * 1000 })
+  return outputPath
+}
+
+// Split audio into chunks of ~CHUNK_MINUTES minutes
+async function splitAudio(inputPath: string, durationSec: number): Promise<string[]> {
+  const chunkPaths: string[] = []
+  const chunkSec = CHUNK_MINUTES * 60
+  let start = 0
+  let index = 0
+
+  while (start < durationSec) {
+    const outPath = join(tmpdir(), `alto-chunk-${Date.now()}-${index}.mp3`)
+    await execFileAsync('ffmpeg', [
+      '-i', inputPath,
+      '-ss', String(start),
+      '-t', String(chunkSec),
+      '-vn', '-ar', '16000', '-ac', '1', '-b:a', '32k',
+      outPath, '-y',
+    ], { timeout: 5 * 60 * 1000 })
+    chunkPaths.push(outPath)
+    start += chunkSec
+    index++
+  }
+
+  return chunkPaths
+}
+
 interface WhisperSegment {
   start: number
   end: number
   text: string
 }
 
-async function runWhisper(filePath: string, language: Language): Promise<WhisperSegment[]> {
+async function runWhisper(filePath: string, language: Language, offsetSec = 0): Promise<WhisperSegment[]> {
   const openai = client()
   const lang = language === 'auto' ? undefined : language
 
@@ -67,8 +107,8 @@ async function runWhisper(filePath: string, language: Language): Promise<Whisper
   })
 
   return (transcription.segments ?? []).map((s) => ({
-    start: s.start,
-    end: s.end,
+    start: s.start + offsetSec,
+    end: s.end + offsetSec,
     text: s.text.trim(),
   }))
 }
@@ -114,7 +154,7 @@ Output STRICT JSON with this shape:
 Rules:
 - Infer speaker changes from context (topic shifts, conversation flow, question/answer patterns)
 - Label speakers as "Speaker 1", "Speaker 2", etc. consistently
-- Keep timestamps from the original
+- Keep original timestamps
 - Summary must be in ${langLabel === 'auto-detect' ? 'the same language as the transcript' : langLabel}
 - Return ONLY the JSON object`,
       },
@@ -150,36 +190,58 @@ export async function transcribeWithOpenAI(args: {
   onProgress?: (step: string) => void
 }): Promise<TranscriptPayload> {
   const ext = getExt(args.mimeType)
-  let tmpPath = await writeBufferToTmp(args.buffer, ext)
-  let compressedPath: string | null = null
+  const tmpPath = writeBufferToTmp(args.buffer, ext)
+  const tempFiles: string[] = [tmpPath]
 
   try {
-    // Compress if too large for Whisper
-    if (args.buffer.length > MAX_WHISPER_BYTES) {
-      if (!hasFfmpeg()) {
-        throw new Error(`File too large for Whisper (${Math.round(args.buffer.length / 1024 / 1024)}MB > 24MB) and ffmpeg not available`)
+    if (!hasFfmpeg()) throw new Error('ffmpeg not available on this server')
+
+    // Always compress first for consistent format + smaller size
+    args.onProgress?.('Compressing audio...')
+    console.log(`Original size: ${Math.round(args.buffer.length / 1024 / 1024)}MB`)
+    const compressedPath = await compressToSpeech(tmpPath)
+    tempFiles.push(compressedPath)
+
+    const compressedSize = statSync(compressedPath).size
+    console.log(`Compressed to ${Math.round(compressedSize / 1024 / 1024)}MB`)
+
+    let allSegments: WhisperSegment[] = []
+
+    if (compressedSize <= MAX_WHISPER_BYTES) {
+      // Single file, send directly
+      args.onProgress?.('Transcribing audio...')
+      console.log('Single-shot Whisper transcription')
+      allSegments = await runWhisper(compressedPath, args.language)
+      console.log(`Whisper returned ${allSegments.length} segments`)
+    } else {
+      // Too large even after compression → split into chunks
+      const durationSec = await getAudioDuration(compressedPath)
+      const totalChunks = Math.ceil(durationSec / (CHUNK_MINUTES * 60))
+      console.log(`Audio ${Math.round(durationSec / 60)}min → splitting into ${totalChunks} chunks`)
+
+      const chunkPaths = await splitAudio(compressedPath, durationSec)
+      tempFiles.push(...chunkPaths)
+
+      for (let i = 0; i < chunkPaths.length; i++) {
+        const offsetSec = i * CHUNK_MINUTES * 60
+        args.onProgress?.(`Transcribing chunk ${i + 1}/${chunkPaths.length}...`)
+        console.log(`Chunk ${i + 1}/${chunkPaths.length} (offset ${offsetSec}s)`)
+
+        const chunkSegments = await runWhisper(chunkPaths[i], args.language, offsetSec)
+        allSegments.push(...chunkSegments)
+        console.log(`Chunk ${i + 1} done: ${chunkSegments.length} segments`)
       }
-      args.onProgress?.('Compressing audio...')
-      console.log(`File size ${Math.round(args.buffer.length / 1024 / 1024)}MB > 24MB, compressing with ffmpeg`)
-      compressedPath = await compressAudio(tmpPath)
-      console.log(`Compressed to ${Math.round(statSync(compressedPath).size / 1024 / 1024)}MB`)
     }
 
-    const whisperInput = compressedPath ?? tmpPath
-
-    args.onProgress?.('Transcribing audio...')
-    console.log('Running Whisper transcription...')
-    const segments = await runWhisper(whisperInput, args.language)
-    console.log(`Whisper returned ${segments.length} segments`)
-
     args.onProgress?.('Adding speaker labels and summary...')
-    console.log('Running GPT-4o diarization...')
-    const result = await diarizeAndSummarize(segments, args.language)
-    console.log(`Final transcript: ${result.segments.length} segments, ${result.speakerCount} speakers`)
+    console.log(`Total segments: ${allSegments.length}, running diarization...`)
+    const result = await diarizeAndSummarize(allSegments, args.language)
+    console.log(`Done: ${result.segments.length} segments, ${result.speakerCount} speakers`)
 
     return result
   } finally {
-    try { if (existsSync(tmpPath)) unlinkSync(tmpPath) } catch {}
-    try { if (compressedPath && existsSync(compressedPath)) unlinkSync(compressedPath) } catch {}
+    for (const f of tempFiles) {
+      try { if (existsSync(f)) unlinkSync(f) } catch {}
+    }
   }
 }
