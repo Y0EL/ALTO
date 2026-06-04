@@ -271,7 +271,8 @@ async function generateSummary(segments: TranscriptSegment[], language: Language
   const text = response.choices[0]?.message?.content ?? ''
   try {
     const parsed = JSON.parse(text) as { summary?: string }
-    return parsed.summary ?? ''
+    const s = parsed.summary
+    return Array.isArray(s) ? s.join('\n') : String(s ?? '')
   } catch {
     return ''
   }

@@ -53,7 +53,7 @@ export function TranscriptViewer({ transcript, filename, isPartial }: Props) {
     triggerDownload(lines.join('\n\n'), `${stripExt(filename)}.srt`, 'text/plain')
   }
 
-  const summaryLines = (transcript.summary ?? '')
+  const summaryLines = String(Array.isArray(transcript.summary) ? transcript.summary.join('\n') : (transcript.summary ?? ''))
     .split('\n')
     .map((l) => l.replace(/^[-*•]\s*/, '').trim())
     .filter(Boolean)
