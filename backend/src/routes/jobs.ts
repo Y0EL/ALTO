@@ -33,6 +33,11 @@ jobsRouter.post('/', async (c) => {
   }
 
   const user = c.get('user')
+
+  if (user.creditSeconds <= 0) {
+    return c.json({ error: 'Kredit kamu habis. Hubungi admin untuk topup.' }, 402)
+  }
+
   const jobId = nanoid()
 
   const [created] = await db

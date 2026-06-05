@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, ArrowClockwise } from '@phosphor-icons/react'
+import { Plus, ArrowClockwise, Coin } from '@phosphor-icons/react'
 import { UploadZone, type Lang } from '../components/UploadZone'
 import { JobStatus } from '../components/JobStatus'
 import { HistoryList } from '../components/HistoryList'
@@ -146,7 +146,19 @@ export default function Home() {
 
       {showHero && (
         <section id="upload" className="mx-auto max-w-3xl px-4 md:px-8 mt-10 md:mt-14">
-          <UploadZone onStart={handleStart} disabled={state.stage !== 'idle'} />
+          {user?.creditSeconds === 0 ? (
+            <div className="card p-8 text-center shadow-sm">
+              <div className="grid place-items-center w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 mx-auto mb-4">
+                <Coin weight="duotone" size={28} className="text-amber-500" />
+              </div>
+              <h3 className="text-lg font-semibold tracking-tight">Kredit habis</h3>
+              <p className="mt-2 text-sm text-zinc-500 leading-relaxed max-w-xs mx-auto">
+                Kamu tidak punya kredit tersisa. Hubungi admin untuk topup dan lanjutkan transkrip.
+              </p>
+            </div>
+          ) : (
+            <UploadZone onStart={handleStart} disabled={state.stage !== 'idle'} />
+          )}
         </section>
       )}
 
@@ -162,7 +174,7 @@ export default function Home() {
 
       {/* FAB — mobile only, visible when idle */}
       <AnimatePresence>
-        {showHero && (
+        {showHero && user?.creditSeconds !== 0 && (
           <motion.button
             key="fab"
             initial={{ scale: 0, opacity: 0 }}
