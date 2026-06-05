@@ -11,6 +11,7 @@ import Landing from './pages/Landing'
 import Home from './pages/Home'
 import Job from './pages/Job'
 import Admin from './pages/Admin'
+import NotFound from './pages/NotFound'
 
 function RootPage() {
   const { user, loading } = useAuth()
@@ -50,7 +51,7 @@ function AnimatedRoutes() {
               </ProtectedRoute>
             }
           />
-          <Route path="*" element={<RootPage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </motion.div>
     </AnimatePresence>
