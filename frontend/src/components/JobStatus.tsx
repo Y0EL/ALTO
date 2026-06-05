@@ -71,25 +71,22 @@ export function JobStatus({ upload, job, onReset, onViewTranscript }: Props) {
       transition={{ type: 'spring', stiffness: 100, damping: 20 }}
       className="card p-6 sm:p-10 overflow-hidden shadow-sm"
     >
-      <div className="grid sm:grid-cols-[auto_1fr] gap-6 sm:gap-8 items-center">
-        <div className="grid place-items-center min-w-[180px] min-h-[180px] mx-auto sm:mx-0">
+      <div className="flex flex-col items-center gap-6 sm:grid sm:grid-cols-[auto_1fr] sm:items-center sm:gap-8">
+        <div className="grid place-items-center w-44 h-44 flex-shrink-0">
           {phase === 'uploading' && (
             <LottiePlayer
-              src="/lottie/upload-wave.json"
               className="w-44 h-44"
               fallback={<WaveformBars bars={9} className="w-40 h-24" />}
             />
           )}
           {phase === 'transcribing' && (
             <LottiePlayer
-              src="/lottie/transcribing.json"
               className="w-44 h-44"
               fallback={<MicTranscribing size={92} />}
             />
           )}
           {phase === 'completed' && (
             <LottiePlayer
-              src="/lottie/success.json"
               className="w-44 h-44"
               fallback={<SuccessCheck size={92} />}
             />
@@ -101,7 +98,7 @@ export function JobStatus({ upload, job, onReset, onViewTranscript }: Props) {
           )}
         </div>
 
-        <div className="text-center sm:text-left">
+        <div className="text-center sm:text-left w-full">
           <p className="eyebrow">
             {phase === 'uploading' && 'Langkah 1 dari 2'}
             {phase === 'transcribing' && 'Langkah 2 dari 2'}
@@ -116,7 +113,7 @@ export function JobStatus({ upload, job, onReset, onViewTranscript }: Props) {
           </p>
 
           {(phase === 'uploading' || phase === 'transcribing') && (
-            <div className="mt-5 max-w-md mx-auto sm:mx-0">
+            <div className="mt-5 max-w-md mx-auto sm:mx-0 w-full">
               <div className="h-1 rounded-full bg-zinc-100 overflow-hidden">
                 <motion.div
                   className="h-full bg-ink rounded-full"
