@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { db } from '../db/client.js'
-import { jobs, type JobStatus } from '../db/schema.js'
+import { jobs, users, type JobStatus } from '../db/schema.js'
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
 import { isAllowedMime, normalizeMime, MAX_FILE_BYTES } from '../lib/validate.js'
 import { deleteGeminiFile } from '../services/gemini.js'
@@ -34,7 +34,16 @@ jobsRouter.post('/', async (c) => {
 
   const user = c.get('user')
 
-  if (user.creditSeconds <= 0) {
+  // Atomic reservation: deduct 1 second under a row lock.
+  // WHERE credit_seconds > 0 ensures two concurrent requests cannot both pass —
+  // PostgreSQL serializes the UPDATE, so only one wins the race.
+  const [reservation] = await db
+    .update(users)
+    .set({ creditSeconds: sql`${users.creditSeconds} - 1` })
+    .where(and(eq(users.id, user.id), sql`${users.creditSeconds} > 0`))
+    .returning({ creditSeconds: users.creditSeconds })
+
+  if (!reservation) {
     return c.json({ error: 'Kredit kamu habis. Hubungi admin untuk topup.' }, 402)
   }
 

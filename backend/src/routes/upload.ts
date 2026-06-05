@@ -106,10 +106,14 @@ async function runTranscriptionTask(args: {
       .where(eq(jobs.id, args.jobId))
       .returning({ durationSec: jobs.durationSec })
 
-    if (updated?.durationSec) {
+    // 1 second was already reserved atomically at job creation.
+    // Deduct the remaining (actual - 1). No GREATEST cap — going negative
+    // blocks the user on their next job attempt, which is the correct behaviour.
+    const remaining = (updated?.durationSec ?? 1) - 1
+    if (remaining > 0) {
       await db
         .update(users)
-        .set({ creditSeconds: sql`GREATEST(0, ${users.creditSeconds} - ${updated.durationSec})` })
+        .set({ creditSeconds: sql`${users.creditSeconds} - ${remaining}` })
         .where(eq(users.id, args.userId))
     }
 
@@ -120,10 +124,15 @@ async function runTranscriptionTask(args: {
   } catch (err) {
     console.error('Transcription failed', err)
     const msg = err instanceof Error ? err.message : String(err)
-    await db
-      .update(jobs)
-      .set({ status: 'failed' satisfies JobStatus, errorMessage: msg })
-      .where(eq(jobs.id, args.jobId))
+    await Promise.all([
+      db.update(jobs)
+        .set({ status: 'failed' satisfies JobStatus, errorMessage: msg })
+        .where(eq(jobs.id, args.jobId)),
+      // Refund the 1-second reservation so a transient error doesn't burn credits
+      db.update(users)
+        .set({ creditSeconds: sql`${users.creditSeconds} + 1` })
+        .where(eq(users.id, args.userId)),
+    ])
     await cacheJobStatus(args.jobId, { status: 'failed', error: msg })
   }
 }

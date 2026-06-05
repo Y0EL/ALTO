@@ -23,7 +23,7 @@ async function main() {
     isAdmin: true,
   })
 
-  console.log(`Created admin user: ${username} / ${password}`)
+  console.log(`Created admin user: ${username}`)
 }
 
 main()
