@@ -13,6 +13,9 @@ import {
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
 import { db } from '../db/client.js'
 import { jobs, users } from '../db/schema.js'
+import { cacheUserStats, getCachedUserStats } from '../services/redis.js'
+
+const DEEPGRAM_COST_PER_MIN = 0.0043
 
 const loginSchema = z.object({
   username: z.string().min(1).max(64),
@@ -69,6 +72,9 @@ authRouter.get('/me', requireAuth, async (c) => {
 authRouter.get('/me/stats', requireAuth, async (c) => {
   const user = c.get('user')
 
+  const cached = await getCachedUserStats(user.id)
+  if (cached) return c.json(cached)
+
   const [agg] = await db
     .select({
       totalDurationSec: sum(jobs.durationSec),
@@ -84,11 +90,18 @@ authRouter.get('/me/stats', requireAuth, async (c) => {
     .where(eq(users.id, user.id))
     .limit(1)
 
-  return c.json({
-    totalDurationSec: Number(agg?.totalDurationSec ?? 0),
+  const totalDurationSec = Number(agg?.totalDurationSec ?? 0)
+  const estimatedCostUSD = parseFloat(((totalDurationSec / 60) * DEEPGRAM_COST_PER_MIN).toFixed(4))
+
+  const stats = {
+    totalDurationSec,
     latestDurationSec: Number(agg?.latestDurationSec ?? 0),
     totalJobs: Number(agg?.totalJobs ?? 0),
     creditSeconds: userRow?.creditSeconds ?? 0,
+    estimatedCostUSD,
     memberSince: userRow?.createdAt ?? null,
-  })
+  }
+
+  await cacheUserStats(user.id, stats)
+  return c.json(stats)
 })

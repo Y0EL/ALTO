@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { House, ClockCounterClockwise, UserCircle, SignOut, ShieldStar, X, Waveform, Clock, FilesIcon, Coin } from '@phosphor-icons/react'
+import { House, ClockCounterClockwise, UserCircle, SignOut, ShieldStar, X, Waveform, Clock, FilesIcon, Coin, CurrencyDollar } from '@phosphor-icons/react'
 import { useAuth } from '../hooks/useAuth'
 import { api, type UserStats } from '../lib/api'
 import { formatDuration } from '../lib/format'
+
+const USD_TO_IDR = 16_000
+
+function formatIDR(usd: number): string {
+  const idr = usd * USD_TO_IDR
+  if (idr < 1000) return `Rp ${Math.round(idr)}`
+  return `Rp ${Intl.NumberFormat('id-ID').format(Math.round(idr))}`
+}
 
 export function BottomNav() {
   const location = useLocation()
@@ -89,7 +97,7 @@ export function BottomNav() {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', stiffness: 400, damping: 38 }}
-              className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-3xl shadow-xl border-t border-zinc-200/80"
+              className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-3xl shadow-xl border-t border-zinc-200/80 max-h-[80dvh] overflow-y-auto"
               style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
             >
               <div className="flex justify-center pt-2.5 pb-4">
@@ -134,19 +142,26 @@ export function BottomNav() {
                       highlight={stats.creditSeconds < 300}
                     />
                     <StatCard
-                      icon={<Waveform weight="duotone" size={18} className="text-blue-500" />}
-                      label="Total Ditranskrip"
-                      value={stats.totalDurationSec > 0 ? formatDuration(stats.totalDurationSec) : '—'}
-                    />
-                    <StatCard
                       icon={<FilesIcon weight="duotone" size={18} className="text-violet-500" />}
                       label="Jumlah File"
                       value={String(stats.totalJobs)}
                     />
                     <StatCard
+                      icon={<Waveform weight="duotone" size={18} className="text-blue-500" />}
+                      label="Total Ditranskrip"
+                      value={stats.totalDurationSec > 0 ? formatDuration(stats.totalDurationSec) : '—'}
+                    />
+                    <StatCard
                       icon={<Clock weight="duotone" size={18} className="text-emerald-500" />}
                       label="Transkrip Terakhir"
                       value={stats.latestDurationSec > 0 ? formatDuration(stats.latestDurationSec) : '—'}
+                    />
+                    <StatCard
+                      icon={<CurrencyDollar weight="duotone" size={18} className="text-zinc-400" />}
+                      label="Est. Biaya Deepgram"
+                      value={stats.estimatedCostUSD > 0 ? `~${formatIDR(stats.estimatedCostUSD)}` : '—'}
+                      sub={stats.estimatedCostUSD > 0 ? `~$${stats.estimatedCostUSD.toFixed(3)}` : undefined}
+                      fullWidth
                     />
                   </div>
                 ) : null}
@@ -183,20 +198,27 @@ function StatCard({
   icon,
   label,
   value,
+  sub,
   highlight,
+  fullWidth,
 }: {
   icon: React.ReactNode
   label: string
   value: string
+  sub?: string
   highlight?: boolean
+  fullWidth?: boolean
 }) {
   return (
-    <div className={`rounded-xl border p-3 flex flex-col gap-1.5 ${highlight ? 'border-red-200 bg-red-50' : 'border-zinc-200/80 bg-zinc-50'}`}>
+    <div className={`rounded-xl border p-3 flex flex-col gap-1.5 ${fullWidth ? 'col-span-2' : ''} ${highlight ? 'border-red-200 bg-red-50' : 'border-zinc-200/80 bg-zinc-50'}`}>
       <div className="flex items-center gap-1.5">
         {icon}
         <span className={`text-[10px] font-medium uppercase tracking-wide ${highlight ? 'text-red-500' : 'text-zinc-400'}`}>{label}</span>
       </div>
-      <span className={`text-base font-semibold tabular-nums leading-none ${highlight ? 'text-red-600' : 'text-zinc-900'}`}>{value}</span>
+      <div className="flex items-baseline gap-2">
+        <span className={`text-base font-semibold tabular-nums leading-none ${highlight ? 'text-red-600' : 'text-zinc-900'}`}>{value}</span>
+        {sub && <span className="text-[11px] text-zinc-400 tabular-nums">{sub}</span>}
+      </div>
     </div>
   )
 }

@@ -35,3 +35,38 @@ export async function getCachedJobStatus(jobId: string): Promise<unknown | null>
     return null
   }
 }
+
+const STATS_TTL_SEC = 300
+
+export async function cacheUserStats(userId: string, stats: unknown): Promise<void> {
+  const redis = getRedis()
+  if (!redis) return
+  try {
+    await redis.set(`user:stats:${userId}`, JSON.stringify(stats), { ex: STATS_TTL_SEC })
+  } catch (err) {
+    console.warn('Redis cacheUserStats failed:', err)
+  }
+}
+
+export async function getCachedUserStats(userId: string): Promise<unknown | null> {
+  const redis = getRedis()
+  if (!redis) return null
+  try {
+    const raw = await redis.get<string>(`user:stats:${userId}`)
+    if (!raw) return null
+    return typeof raw === 'string' ? JSON.parse(raw) : raw
+  } catch (err) {
+    console.warn('Redis getCachedUserStats failed:', err)
+    return null
+  }
+}
+
+export async function invalidateUserStats(userId: string): Promise<void> {
+  const redis = getRedis()
+  if (!redis) return
+  try {
+    await redis.del(`user:stats:${userId}`)
+  } catch (err) {
+    console.warn('Redis invalidateUserStats failed:', err)
+  }
+}

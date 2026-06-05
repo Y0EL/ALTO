@@ -12,6 +12,7 @@ import {
 import { ApiError, api, type ManagedUser } from '../lib/api'
 import { formatRelativeTime, formatDuration } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
+import { TopupModal } from '../components/TopupModal'
 
 export default function Admin() {
   const { user: self } = useAuth()
@@ -24,6 +25,7 @@ export default function Admin() {
   const [makeAdmin, setMakeAdmin] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
+  const [topupTarget, setTopupTarget] = useState<ManagedUser | null>(null)
 
   const load = async () => {
     try {
@@ -95,24 +97,7 @@ export default function Admin() {
     }
   }
 
-  const handleTopupCredits = async (u: ManagedUser) => {
-    const input = prompt(
-      `Topup kredit untuk "${u.username}"\nSisa kredit: ${formatDuration(u.creditSeconds)}\n\nTambah berapa menit?`
-    )
-    if (input === null) return
-    const minutes = Number(input)
-    if (isNaN(minutes) || minutes <= 0) {
-      alert('Masukkan angka menit yang valid')
-      return
-    }
-    try {
-      await api.patch(`/users/${u.id}/credits`, { addSeconds: minutes * 60 })
-      await load()
-      flashSuccess(`+${minutes} menit kredit untuk "${u.username}"`)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal topup kredit')
-    }
-  }
+  const handleTopupCredits = (u: ManagedUser) => setTopupTarget(u)
 
   return (
     <div className="mx-auto max-w-4xl px-4 md:px-8 py-12">
@@ -271,6 +256,16 @@ export default function Admin() {
           </ul>
         )}
       </section>
+
+      <TopupModal
+        user={topupTarget}
+        onClose={() => setTopupTarget(null)}
+        onSuccess={() => {
+          void load()
+          flashSuccess(`Kredit ditambahkan untuk "${topupTarget?.username}"`)
+          setTopupTarget(null)
+        }}
+      />
     </div>
   )
 }

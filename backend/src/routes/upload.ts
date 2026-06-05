@@ -4,7 +4,7 @@ import { db } from '../db/client.js'
 import { jobs, users, type JobStatus, type TranscriptPayload } from '../db/schema.js'
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
 import { transcribeWithDeepgram } from '../services/deepgram.js'
-import { cacheJobStatus } from '../services/redis.js'
+import { cacheJobStatus, invalidateUserStats } from '../services/redis.js'
 
 export const uploadRouter = new Hono<AppEnv>()
 
@@ -113,7 +113,10 @@ async function runTranscriptionTask(args: {
         .where(eq(users.id, args.userId))
     }
 
-    await cacheJobStatus(args.jobId, { status: 'completed', progress: 100 })
+    await Promise.all([
+      cacheJobStatus(args.jobId, { status: 'completed', progress: 100 }),
+      invalidateUserStats(args.userId),
+    ])
   } catch (err) {
     console.error('Transcription failed', err)
     const msg = err instanceof Error ? err.message : String(err)

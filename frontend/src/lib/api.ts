@@ -56,6 +56,7 @@ export interface UserStats {
   latestDurationSec: number
   totalJobs: number
   creditSeconds: number
+  estimatedCostUSD: number
   memberSince: string | null
 }
 
