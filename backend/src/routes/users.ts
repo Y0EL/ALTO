@@ -16,9 +16,11 @@ const passwordSchema = z.object({
   newPassword: z.string().min(3).max(256),
 })
 
+const MAX_CREDIT_SECONDS = 315_360_000 // 10 tahun
+
 const creditsSchema = z.object({
-  creditSeconds: z.number().int().min(0).optional(),
-  addSeconds: z.number().int().optional(),
+  creditSeconds: z.number().int().min(0).max(MAX_CREDIT_SECONDS).optional(),
+  addSeconds: z.number().int().min(1).max(MAX_CREDIT_SECONDS).optional(),
 })
 
 export const usersRouter = new Hono<AppEnv>()

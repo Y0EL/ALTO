@@ -23,7 +23,7 @@ export function TopupModal({ user, onClose, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   const parsed = parseInt(minutes, 10)
-  const valid = !isNaN(parsed) && parsed > 0
+  const valid = !isNaN(parsed) && parsed > 0 && parsed <= 525_600
 
   const handleQuick = (m: number) => setMinutes(String(m))
 
@@ -109,6 +109,7 @@ export function TopupModal({ user, onClose, onSuccess }: Props) {
                 <input
                   type="number"
                   min="1"
+                  max="525600"
                   value={minutes}
                   onChange={(e) => setMinutes(e.target.value)}
                   placeholder="Atau ketik jumlah menit…"
