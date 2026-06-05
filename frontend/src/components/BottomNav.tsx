@@ -1,14 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { House, ClockCounterClockwise, UserCircle, SignOut, ShieldStar, X } from '@phosphor-icons/react'
+import { House, ClockCounterClockwise, UserCircle, SignOut, ShieldStar, X, Waveform, Clock, FilesIcon, Coin } from '@phosphor-icons/react'
 import { useAuth } from '../hooks/useAuth'
+import { api, type UserStats } from '../lib/api'
+import { formatDuration } from '../lib/format'
 
 export function BottomNav() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [profileOpen, setProfileOpen] = useState(false)
+  const [stats, setStats] = useState<UserStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!profileOpen || stats) return
+    setStatsLoading(true)
+    api.get<UserStats>('/auth/me/stats')
+      .then(setStats)
+      .catch(() => {})
+      .finally(() => setStatsLoading(false))
+  }, [profileOpen])
 
   if (!user) return null
 
@@ -105,6 +118,40 @@ export function BottomNav() {
                 </div>
               </div>
 
+              <div className="px-5 pt-2 pb-1">
+                {statsLoading ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[0,1,2,3].map(i => (
+                      <div key={i} className="h-16 rounded-xl bg-zinc-100 animate-pulse" />
+                    ))}
+                  </div>
+                ) : stats ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatCard
+                      icon={<Coin weight="duotone" size={18} className="text-amber-500" />}
+                      label="Sisa Kredit"
+                      value={stats.creditSeconds > 0 ? formatDuration(stats.creditSeconds) : '—'}
+                      highlight={stats.creditSeconds < 300}
+                    />
+                    <StatCard
+                      icon={<Waveform weight="duotone" size={18} className="text-blue-500" />}
+                      label="Total Ditranskrip"
+                      value={stats.totalDurationSec > 0 ? formatDuration(stats.totalDurationSec) : '—'}
+                    />
+                    <StatCard
+                      icon={<FilesIcon weight="duotone" size={18} className="text-violet-500" />}
+                      label="Jumlah File"
+                      value={String(stats.totalJobs)}
+                    />
+                    <StatCard
+                      icon={<Clock weight="duotone" size={18} className="text-emerald-500" />}
+                      label="Transkrip Terakhir"
+                      value={stats.latestDurationSec > 0 ? formatDuration(stats.latestDurationSec) : '—'}
+                    />
+                  </div>
+                ) : null}
+              </div>
+
               <div className="px-5 pt-1 flex flex-col gap-1">
                 {user.isAdmin && (
                   <Link
@@ -129,6 +176,28 @@ export function BottomNav() {
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  highlight,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  highlight?: boolean
+}) {
+  return (
+    <div className={`rounded-xl border p-3 flex flex-col gap-1.5 ${highlight ? 'border-red-200 bg-red-50' : 'border-zinc-200/80 bg-zinc-50'}`}>
+      <div className="flex items-center gap-1.5">
+        {icon}
+        <span className={`text-[10px] font-medium uppercase tracking-wide ${highlight ? 'text-red-500' : 'text-zinc-400'}`}>{label}</span>
+      </div>
+      <span className={`text-base font-semibold tabular-nums leading-none ${highlight ? 'text-red-600' : 'text-zinc-900'}`}>{value}</span>
+    </div>
   )
 }
 

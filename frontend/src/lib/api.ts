@@ -48,6 +48,15 @@ export interface SessionUser {
   id: string
   username: string
   isAdmin: boolean
+  creditSeconds: number
+}
+
+export interface UserStats {
+  totalDurationSec: number
+  latestDurationSec: number
+  totalJobs: number
+  creditSeconds: number
+  memberSince: string | null
 }
 
 export interface JobSummary {
@@ -101,5 +110,6 @@ export interface ManagedUser {
   id: string
   username: string
   isAdmin: boolean
+  creditSeconds: number
   createdAt: string
 }

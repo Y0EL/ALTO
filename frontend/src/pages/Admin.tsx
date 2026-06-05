@@ -7,9 +7,10 @@ import {
   ShieldStar,
   User as UserIcon,
   CheckCircle,
+  Coin,
 } from '@phosphor-icons/react'
 import { ApiError, api, type ManagedUser } from '../lib/api'
-import { formatRelativeTime } from '../lib/format'
+import { formatRelativeTime, formatDuration } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Admin() {
@@ -91,6 +92,25 @@ export default function Admin() {
       flashSuccess(`Password "${u.username}" direset`)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal reset password')
+    }
+  }
+
+  const handleTopupCredits = async (u: ManagedUser) => {
+    const input = prompt(
+      `Topup kredit untuk "${u.username}"\nSisa kredit: ${formatDuration(u.creditSeconds)}\n\nTambah berapa menit?`
+    )
+    if (input === null) return
+    const minutes = Number(input)
+    if (isNaN(minutes) || minutes <= 0) {
+      alert('Masukkan angka menit yang valid')
+      return
+    }
+    try {
+      await api.patch(`/users/${u.id}/credits`, { addSeconds: minutes * 60 })
+      await load()
+      flashSuccess(`+${minutes} menit kredit untuk "${u.username}"`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal topup kredit')
     }
   }
 
@@ -217,8 +237,19 @@ export default function Admin() {
                     {u.isAdmin ? 'admin · ' : ''}
                     dibuat {formatRelativeTime(u.createdAt)}
                   </p>
+                  <p className={`text-xs mt-0.5 font-medium tabular-nums ${u.creditSeconds < 300 ? 'text-red-500' : 'text-emerald-600'}`}>
+                    <Coin size={11} className="inline mr-0.5 mb-0.5" weight="duotone" />
+                    {formatDuration(u.creditSeconds)} kredit tersisa
+                  </p>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleTopupCredits(u)}
+                    className="grid place-items-center w-9 h-9 rounded-lg hover:bg-amber-50 hover:text-amber-600 text-zinc-600"
+                    title="Topup kredit"
+                  >
+                    <Coin size={16} />
+                  </button>
                   <button
                     onClick={() => handleResetPassword(u)}
                     className="grid place-items-center w-9 h-9 rounded-lg hover:bg-zinc-200 text-zinc-600"

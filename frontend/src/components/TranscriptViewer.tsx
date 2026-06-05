@@ -159,8 +159,8 @@ export function TranscriptViewer({ transcript, filename, isPartial }: Props) {
         )}
       </div>
 
-      <div className="sm:hidden fixed inset-x-0 z-[35] px-4 pt-3 bg-gradient-to-t from-white via-white to-white/0"
-        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
+      <div className="sm:hidden fixed inset-x-0 z-[45] px-4 pt-3 bg-gradient-to-t from-white via-white to-white/0"
+        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom) + 0.5rem)' }}>
         <div className="flex gap-2 rounded-2xl bg-ink p-2 shadow-xl">
           <button
             onClick={copyAll}

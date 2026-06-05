@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
-import { jobs, type JobStatus, type TranscriptPayload } from '../db/schema.js'
+import { jobs, users, type JobStatus, type TranscriptPayload } from '../db/schema.js'
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
 import { transcribeWithDeepgram } from '../services/deepgram.js'
 import { cacheJobStatus } from '../services/redis.js'
@@ -63,6 +63,7 @@ uploadRouter.put('/:jobId', async (c) => {
 
   void runTranscriptionTask({
     jobId,
+    userId: user.id,
     buffer,
     mimeType: job.mimeType,
     language: job.language as 'id' | 'en' | 'auto',
@@ -73,6 +74,7 @@ uploadRouter.put('/:jobId', async (c) => {
 
 async function runTranscriptionTask(args: {
   jobId: string
+  userId: string
   buffer: Buffer
   mimeType: string
   language: 'id' | 'en' | 'auto'
@@ -94,7 +96,7 @@ async function runTranscriptionTask(args: {
       },
     })
 
-    await db
+    const [updated] = await db
       .update(jobs)
       .set({
         status: 'completed' satisfies JobStatus,
@@ -102,6 +104,15 @@ async function runTranscriptionTask(args: {
         completedAt: new Date(),
       })
       .where(eq(jobs.id, args.jobId))
+      .returning({ durationSec: jobs.durationSec })
+
+    if (updated?.durationSec) {
+      await db
+        .update(users)
+        .set({ creditSeconds: sql`GREATEST(0, ${users.creditSeconds} - ${updated.durationSec})` })
+        .where(eq(users.id, args.userId))
+    }
+
     await cacheJobStatus(args.jobId, { status: 'completed', progress: 100 })
   } catch (err) {
     console.error('Transcription failed', err)
