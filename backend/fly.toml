@@ -1,4 +1,4 @@
-app = "audio-to-text-api"
+app = "alto"
 primary_region = "sin"
 
 [build]
@@ -6,6 +6,7 @@ primary_region = "sin"
 [env]
   NODE_ENV = "production"
   PORT = "3000"
+  ALLOWED_ORIGINS = "https://alto.yoel.online,http://localhost:5173"
 
 [deploy]
   release_command = "node dist/db/migrate.js && node dist/db/seed.js"
