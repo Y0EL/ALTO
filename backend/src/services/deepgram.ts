@@ -121,7 +121,7 @@ export async function transcribeWithDeepgram(args: {
   mimeType: string
   language: Language
   onProgress?: (step: string) => void
-}): Promise<TranscriptPayload> {
+}): Promise<{ payload: TranscriptPayload; durationSec: number }> {
   const key = dgKey()
 
   const dgLang = args.language === 'id' ? 'id' : args.language === 'en' ? 'en' : 'id'
@@ -167,10 +167,16 @@ export async function transcribeWithDeepgram(args: {
 
   const uniqueSpeakers = new Set(segments.map((s) => s.speaker))
 
+  // Actual audio duration from the last word's end timestamp (Deepgram is authoritative)
+  const durationSec = Math.ceil(words[words.length - 1]?.end ?? 0)
+
   return {
-    segments,
-    speakerCount: uniqueSpeakers.size,
-    summary,
-    language: args.language === 'auto' ? 'mixed' : args.language,
+    payload: {
+      segments,
+      speakerCount: uniqueSpeakers.size,
+      summary,
+      language: args.language === 'auto' ? 'mixed' : args.language,
+    },
+    durationSec,
   }
 }

@@ -145,7 +145,7 @@ export default function Admin() {
           <div>
             <label className="label">Password</label>
             <input
-              type="text"
+              type="password"
               required
               minLength={3}
               value={newPassword}

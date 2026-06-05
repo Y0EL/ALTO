@@ -55,7 +55,7 @@ app.route('/upload', uploadRouter)
 
 app.onError((err, c) => {
   console.error('Unhandled error:', err)
-  return c.json({ error: 'Internal server error', message: err.message }, 500)
+  return c.json({ error: 'Internal server error' }, 500)
 })
 
 // On startup: mark any stuck jobs as failed (machine restart mid-transcription)

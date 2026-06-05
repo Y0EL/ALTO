@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db/client.js'
-import { users } from '../db/schema.js'
+import { users, sessions } from '../db/schema.js'
 import { createUser, findUserByUsername, hashPassword } from '../services/auth.js'
 import { requireAdmin, type AppEnv } from '../middleware/auth.js'
 
@@ -87,6 +87,10 @@ usersRouter.patch('/:id/password', async (c) => {
     .returning({ id: users.id })
 
   if (!updated) return c.json({ error: 'User tidak ditemukan' }, 404)
+
+  // Invalidate all active sessions so the new password takes effect immediately
+  await db.delete(sessions).where(eq(sessions.userId, id))
+
   return c.json({ ok: true })
 })
 

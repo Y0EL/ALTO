@@ -80,7 +80,7 @@ async function runTranscriptionTask(args: {
   language: 'id' | 'en' | 'auto'
 }): Promise<void> {
   try {
-    const transcript: TranscriptPayload = await transcribeWithDeepgram({
+    const { payload: transcript, durationSec: actualDuration } = await transcribeWithDeepgram({
       buffer: args.buffer,
       mimeType: args.mimeType,
       language: args.language,
@@ -96,20 +96,21 @@ async function runTranscriptionTask(args: {
       },
     })
 
-    const [updated] = await db
+    // Store Deepgram-measured duration (authoritative), not the client estimate
+    await db
       .update(jobs)
       .set({
         status: 'completed' satisfies JobStatus,
         transcript,
+        durationSec: actualDuration,
         completedAt: new Date(),
       })
       .where(eq(jobs.id, args.jobId))
-      .returning({ durationSec: jobs.durationSec })
 
     // 1 second was already reserved atomically at job creation.
     // Deduct the remaining (actual - 1). No GREATEST cap — going negative
     // blocks the user on their next job attempt, which is the correct behaviour.
-    const remaining = (updated?.durationSec ?? 1) - 1
+    const remaining = actualDuration - 1
     if (remaining > 0) {
       await db
         .update(users)
