@@ -10,6 +10,8 @@ import { deleteGeminiFile } from '../services/gemini.js'
 import { cacheJobStatus, getCachedJobStatus } from '../services/redis.js'
 import { createUploadUrl, isObjectStorageEnabled, isObjectStorageRequired } from '../services/storage.js'
 
+const directBrowserUploadEnabled = process.env.BROWSER_DIRECT_UPLOAD === 'true'
+
 const createSchema = z.object({
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(1),
@@ -91,6 +93,14 @@ jobsRouter.post('/', async (c) => {
   }
 
   await cacheJobStatus(jobId, { status: 'pending', progress: 0 })
+
+  if (storageEnabled && storageKey && !directBrowserUploadEnabled) {
+    return c.json({
+      jobId: created.id,
+      uploadMethod: 'api',
+      uploadUrl: `/upload/${created.id}/storage`,
+    })
+  }
 
   if (storageEnabled && storageKey) {
     let signedUrl: string

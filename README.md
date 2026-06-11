@@ -94,7 +94,7 @@ flowchart TB
 | Admin | Kelola user, role admin, reset password, top-up kredit |
 | Kredit | Kredit berbasis detik, reserve estimasi durasi sebelum upload |
 | Reconcile | Durasi aktual Deepgram dipakai untuk refund/deduct selisih |
-| Upload | Production mode memakai signed URL ke S3/R2 |
+| Upload | Production mode stream via API ke S3/R2; signed URL optional |
 | Worker | Job `queued` diproses worker terpisah |
 | Transkrip | Speaker label, timestamp, punctuation, smart formatting |
 | Ringkasan | Summary meeting via OpenAI |
@@ -185,6 +185,7 @@ S3_BUCKET=alto-staging-uploads
 S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 S3_FORCE_PATH_STYLE=true
+BROWSER_DIRECT_UPLOAD=false
 
 DATABASE_URL=postgres://user:pass@host/db?sslmode=require
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
@@ -429,7 +430,7 @@ Worker harus dideploy sebagai process/service terpisah dengan env yang sama:
 npm --prefix backend run start:worker
 ```
 
-Untuk Cloudflare R2/S3 bucket, set CORS agar frontend origin boleh `PUT` ke signed URL:
+Default production upload ALTO tidak butuh R2 CORS karena browser upload ke API, lalu API stream ke R2 tanpa buffer penuh di memory. Kalau `BROWSER_DIRECT_UPLOAD=true`, set CORS agar frontend origin boleh `PUT` ke signed URL:
 
 ```json
 [
@@ -473,7 +474,7 @@ Checklist minimal:
 - Admin login sukses.
 - Test user bisa dibuat dan di-topup.
 - User tanpa kredit cukup tidak bisa start job.
-- Upload kecil lewat signed URL selesai.
+- Upload kecil selesai dan job masuk queue.
 - Job tidak stuck di `queued`.
 - Transcript selesai bisa dibuka.
 - Share link bisa dibuka tanpa login.
@@ -488,7 +489,7 @@ Checklist minimal:
 - Login punya rate limit.
 - Job read/delete/upload/share owner-scoped.
 - Public transcript hanya lewat token yang sulit ditebak.
-- Production upload memakai signed URL ke object storage. Fallback API upload hanya untuk local/dev.
+- Production upload default memakai API proxy streaming ke object storage. Direct signed URL upload optional jika R2 CORS sudah aktif.
 
 ## Lisensi
 

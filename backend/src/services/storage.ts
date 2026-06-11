@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
+import type { Readable } from 'node:stream'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const DEFAULT_SIGNED_URL_TTL_SEC = 15 * 60
@@ -54,6 +55,21 @@ export async function createUploadUrl(args: {
   return getSignedUrl(client(), command, {
     expiresIn: Number(process.env.S3_SIGNED_URL_TTL_SEC ?? DEFAULT_SIGNED_URL_TTL_SEC),
   })
+}
+
+export async function writeObjectStream(args: {
+  key: string
+  mimeType: string
+  sizeBytes: number
+  body: Readable
+}): Promise<void> {
+  await client().send(new PutObjectCommand({
+    Bucket: bucket(),
+    Key: args.key,
+    Body: args.body,
+    ContentType: args.mimeType,
+    ContentLength: args.sizeBytes,
+  }))
 }
 
 export async function readObject(key: string): Promise<Buffer> {
