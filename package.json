@@ -1,10 +1,11 @@
 {
-  "name": "audio-to-text",
+  "name": "ALTO",
   "version": "0.1.0",
   "private": true,
-  "description": "Meeting audio transcription with Gemini",
+  "description": "Meeting MOM Generator",
   "scripts": {
     "dev:backend": "npm --prefix backend run dev",
+    "dev:worker": "npm --prefix backend run dev:worker",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build"

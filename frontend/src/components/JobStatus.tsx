@@ -25,17 +25,22 @@ function derivePhase(
       phase: 'completed',
       progress: 100,
       message: 'Transkrip selesai',
-      detail: `${job.transcript?.segments.length ?? 0} segmen · ${job.transcript?.speakerCount ?? 1} pembicara`,
+      detail: `${job.transcript?.segments.length ?? 0} segmen - ${job.transcript?.speakerCount ?? 1} pembicara`,
     }
   }
-  if (job?.status === 'failed' || upload.stage === 'error') {
+
+  if (job?.status === 'failed' || job?.status === 'cancelled' || upload.stage === 'error') {
     return {
       phase: 'failed',
       progress: 0,
-      message: 'Gagal',
-      detail: job?.error ?? upload.error ?? 'Terjadi kesalahan',
+      message: job?.status === 'cancelled' ? 'Dibatalkan' : 'Gagal',
+      detail:
+        job?.status === 'cancelled'
+          ? 'Transkrip dibatalkan dan kredit dikembalikan.'
+          : job?.error ?? upload.error ?? 'Terjadi kesalahan',
     }
   }
+
   if (upload.stage === 'creating' || upload.stage === 'uploading') {
     return {
       phase: 'uploading',
@@ -44,18 +49,24 @@ function derivePhase(
       detail: `${upload.progress}% terkirim`,
     }
   }
+
   if (
+    job?.status === 'queued' ||
     job?.status === 'transcribing' ||
     job?.status === 'uploading' ||
     upload.stage === 'queued'
   ) {
     return {
       phase: 'transcribing',
-      progress: 60,
-      message: 'ALTO sedang mendengarkan',
-      detail: 'Mengidentifikasi pembicara dan menulis transkrip…',
+      progress: job?.progress ?? (job?.status === 'queued' ? 20 : 60),
+      message: job?.status === 'queued' ? 'Masuk antrian' : 'ALTO sedang mendengarkan',
+      detail:
+        job?.status === 'queued'
+          ? 'Audio sudah terkirim dan menunggu worker transkrip.'
+          : 'Mengidentifikasi pembicara dan menulis transkrip...',
     }
   }
+
   return { phase: 'idle', progress: 0, message: '', detail: '' }
 }
 
@@ -101,7 +112,7 @@ export function JobStatus({ upload, job, onReset, onViewTranscript }: Props) {
         <div className="text-center sm:text-left w-full">
           <p className="eyebrow">
             {phase === 'uploading' && 'Langkah 1 dari 2'}
-            {phase === 'transcribing' && 'Langkah 2 dari 2'}
+            {phase === 'transcribing' && (job?.status === 'queued' ? 'Antrian' : 'Langkah 2 dari 2')}
             {phase === 'completed' && 'Selesai'}
             {phase === 'failed' && 'Gagal'}
           </p>
@@ -123,7 +134,7 @@ export function JobStatus({ upload, job, onReset, onViewTranscript }: Props) {
                 />
               </div>
               <div className="mt-2 flex justify-between text-xs text-zinc-500">
-                <span>{phase === 'uploading' ? 'Mengirim' : 'Memproses'}</span>
+                <span>{phase === 'uploading' ? 'Mengirim' : job?.status === 'queued' ? 'Menunggu' : 'Memproses'}</span>
                 <span className="tabular-nums">{Math.round(progress)}%</span>
               </div>
             </div>

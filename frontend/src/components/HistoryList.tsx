@@ -37,7 +37,7 @@ export function HistoryList({ refreshKey }: Props) {
   const handleDelete = async (e: React.MouseEvent, job: JobSummary) => {
     e.preventDefault()
     e.stopPropagation()
-    const isRunning = job.status === 'uploading' || job.status === 'transcribing' || job.status === 'pending'
+    const isRunning = job.status === 'uploading' || job.status === 'queued' || job.status === 'transcribing' || job.status === 'pending'
     const msg = isRunning
       ? `Batalkan proses "${job.filename}"?`
       : `Hapus transkrip "${job.filename}"?`
@@ -110,7 +110,7 @@ export function HistoryList({ refreshKey }: Props) {
               disabled={deletingId === job.id}
               className="grid place-items-center w-9 h-9 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 disabled:opacity-40"
               title={
-                job.status === 'transcribing' || job.status === 'uploading' || job.status === 'pending'
+                job.status === 'transcribing' || job.status === 'queued' || job.status === 'uploading' || job.status === 'pending'
                   ? 'Batalkan'
                   : 'Hapus'
               }

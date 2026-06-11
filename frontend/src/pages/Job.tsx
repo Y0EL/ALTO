@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Trash, WarningCircle, XCircle } from '@phosphor-icons/react'
-import { ApiError, api, type JobDetail } from '../lib/api'
+import { ArrowLeft, Check, ShareNetwork, Trash, WarningCircle, XCircle } from '@phosphor-icons/react'
+import { ApiError, api, type JobDetail, type ShareJobResponse } from '../lib/api'
 import { TranscriptViewer } from '../components/TranscriptViewer'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { formatBytes, formatDuration, formatRelativeTime } from '../lib/format'
@@ -14,6 +14,8 @@ export default function Job() {
   const [initial, setInitial] = useState<JobDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [shared, setShared] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -29,6 +31,7 @@ export default function Job() {
 
   const isActive =
     initial?.status === 'uploading' ||
+    initial?.status === 'queued' ||
     initial?.status === 'transcribing' ||
     initial?.status === 'pending'
   const { job: polled } = useJobPolling(isActive ? (id ?? null) : null)
@@ -36,7 +39,7 @@ export default function Job() {
 
   const handleDelete = async (force?: boolean) => {
     if (!id || !job) return
-    const isRunning = job.status === 'uploading' || job.status === 'transcribing' || job.status === 'pending'
+    const isRunning = job.status === 'uploading' || job.status === 'queued' || job.status === 'transcribing' || job.status === 'pending'
     const msg = isRunning
       ? 'Batalkan proses transkrip ini? Job akan dihapus dari riwayat.'
       : 'Hapus transkrip ini dari riwayat? Aksi tidak bisa dibatalkan.'
@@ -49,6 +52,38 @@ export default function Job() {
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal menghapus')
       setDeleting(false)
+    }
+  }
+
+  const handleShare = async () => {
+    if (!id || !job) return
+    setSharing(true)
+    try {
+      const data = job.shareToken
+        ? { shareToken: job.shareToken, sharePath: `/share/${job.shareToken}` }
+        : await api.post<ShareJobResponse>(`/jobs/${id}/share`)
+      const shareUrl = `${window.location.origin}${data.sharePath}`
+
+      setInitial((current) => (current ? { ...current, shareToken: data.shareToken } : current))
+
+      if (navigator.share) {
+        await navigator.share({
+          title: job.filename,
+          text: 'Transkrip ALTO',
+          url: shareUrl,
+        })
+      } else {
+        await navigator.clipboard.writeText(shareUrl)
+      }
+
+      setShared(true)
+      setTimeout(() => setShared(false), 1800)
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        alert(err instanceof Error ? err.message : 'Gagal membuat link bagikan')
+      }
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -69,7 +104,7 @@ export default function Job() {
 
   if (!job) return <LoadingScreen />
 
-  const isRunning = job.status === 'uploading' || job.status === 'transcribing' || job.status === 'pending'
+  const isRunning = job.status === 'uploading' || job.status === 'queued' || job.status === 'transcribing' || job.status === 'pending'
 
   return (
     <div className="mx-auto max-w-3xl px-4 md:px-8 pt-6 pb-24 md:pb-12">
@@ -102,30 +137,44 @@ export default function Job() {
                 .join(' · ')}
             </p>
           </div>
-          <button
-            onClick={() => handleDelete()}
-            disabled={deleting}
-            className={`grid place-items-center w-9 h-9 rounded-lg flex-shrink-0 ${
-              isRunning
-                ? 'text-zinc-400 hover:text-red-600 hover:bg-red-50'
-                : 'text-zinc-400 hover:text-red-600 hover:bg-red-50'
-            } disabled:opacity-40`}
-            title={isRunning ? 'Batalkan & hapus' : 'Hapus'}
-          >
-            {isRunning ? <XCircle size={20} /> : <Trash size={18} />}
-          </button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={handleShare}
+              disabled={sharing}
+              className="grid place-items-center w-9 h-9 rounded-lg text-zinc-500 hover:text-ink hover:bg-zinc-100 disabled:opacity-40"
+              title={shared ? 'Link disalin' : 'Bagikan'}
+            >
+              {shared ? <Check size={18} weight="bold" /> : <ShareNetwork size={18} />}
+            </button>
+            <button
+              onClick={() => handleDelete()}
+              disabled={deleting}
+              className={`grid place-items-center w-9 h-9 rounded-lg ${
+                isRunning
+                  ? 'text-zinc-400 hover:text-red-600 hover:bg-red-50'
+                  : 'text-zinc-400 hover:text-red-600 hover:bg-red-50'
+              } disabled:opacity-40`}
+              title={isRunning ? 'Batalkan & hapus' : 'Hapus'}
+            >
+              {isRunning ? <XCircle size={20} /> : <Trash size={18} />}
+            </button>
+          </div>
         </div>
       </motion.div>
 
       <div className="mt-8">
         {job.status === 'completed' && job.transcript ? (
           <TranscriptViewer transcript={job.transcript} filename={job.filename} />
-        ) : job.status === 'failed' ? (
+        ) : job.status === 'failed' || job.status === 'cancelled' ? (
           <div className="card p-8 text-center">
             <WarningCircle weight="duotone" size={48} className="mx-auto text-red-500" />
-            <h2 className="mt-4 text-lg font-semibold">Transkrip gagal</h2>
+            <h2 className="mt-4 text-lg font-semibold">
+              {job.status === 'cancelled' ? 'Transkrip dibatalkan' : 'Transkrip gagal'}
+            </h2>
             <p className="mt-2 text-sm text-zinc-600 max-w-md mx-auto break-words">
-              {job.error || 'Terjadi kesalahan tak dikenal.'}
+              {job.status === 'cancelled'
+                ? 'Job ini dibatalkan dan kredit estimasi dikembalikan.'
+                : job.error || 'Terjadi kesalahan tak dikenal.'}
             </p>
             <button onClick={() => handleDelete()} disabled={deleting} className="btn-ghost mt-6">
               Hapus dari riwayat
@@ -175,7 +224,7 @@ export default function Job() {
               ))}
             </div>
             <p className="text-sm text-zinc-600">
-              {job.status === 'transcribing' ? 'ALTO sedang mendengarkan...' : 'Memproses...'}
+              {job.status === 'queued' ? 'Menunggu worker transkrip...' : job.status === 'transcribing' ? 'ALTO sedang mendengarkan...' : 'Memproses...'}
             </p>
             <button
               onClick={() => handleDelete()}

@@ -10,6 +10,7 @@ import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Home from './pages/Home'
 import Job from './pages/Job'
+import SharedJob from './pages/SharedJob'
 import Admin from './pages/Admin'
 import NotFound from './pages/NotFound'
 
@@ -35,6 +36,7 @@ function AnimatedRoutes() {
         <Routes location={location}>
           <Route path="/" element={<RootPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/share/:token" element={<SharedJob />} />
           <Route
             path="/job/:id"
             element={

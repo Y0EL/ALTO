@@ -5,12 +5,46 @@ import { jobs, users, type JobStatus, type TranscriptPayload } from '../db/schem
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
 import { transcribeWithDeepgram } from '../services/deepgram.js'
 import { cacheJobStatus, invalidateUserStats } from '../services/redis.js'
+import { isObjectStorageEnabled } from '../services/storage.js'
 
 export const uploadRouter = new Hono<AppEnv>()
 
 uploadRouter.use('*', requireAuth)
 
+uploadRouter.post('/:jobId/complete', async (c) => {
+  const user = c.get('user')
+  const jobId = c.req.param('jobId')
+
+  const [job] = await db
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.id, jobId), eq(jobs.userId, user.id)))
+    .limit(1)
+
+  if (!job) return c.json({ error: 'Job tidak ditemukan' }, 404)
+  if (!job.storageKey) return c.json({ error: 'Job ini tidak memakai object storage upload' }, 409)
+  if (job.status !== 'pending' && job.status !== 'uploading') {
+    return c.json({ error: `Job sudah ${job.status}, tidak bisa di-queue ulang` }, 409)
+  }
+
+  await db
+    .update(jobs)
+    .set({
+      status: 'queued' satisfies JobStatus,
+      uploadedAt: new Date(),
+      queuedAt: new Date(),
+    })
+    .where(and(eq(jobs.id, jobId), eq(jobs.userId, user.id)))
+
+  await cacheJobStatus(jobId, { status: 'queued', progress: 20 })
+  return c.json({ jobId, status: 'queued' })
+})
+
 uploadRouter.put('/:jobId', async (c) => {
+  if (isObjectStorageEnabled()) {
+    return c.json({ error: 'Direct object storage upload aktif. Gunakan signed upload URL.' }, 409)
+  }
+
   const user = c.get('user')
   const jobId = c.req.param('jobId')
 
@@ -51,6 +85,12 @@ uploadRouter.put('/:jobId', async (c) => {
       .update(jobs)
       .set({ status: 'failed' satisfies JobStatus, errorMessage: `Upload gagal: ${msg}` })
       .where(eq(jobs.id, jobId))
+    if (job.durationSec && job.durationSec > 0) {
+      await db
+        .update(users)
+        .set({ creditSeconds: sql`${users.creditSeconds} + ${job.durationSec}` })
+        .where(eq(users.id, user.id))
+    }
     await cacheJobStatus(jobId, { status: 'failed', error: msg })
     return c.json({ error: 'Gagal membaca upload', detail: msg }, 502)
   }
@@ -87,14 +127,25 @@ async function runTranscriptionTask(args: {
       onProgress: async (step) => {
         console.log(`[${args.jobId}] ${step}`)
         const progressMap: Record<string, number> = {
-          'Compressing audio...': 35,
           'Transcribing audio...': 50,
-          'Adding speaker labels and summary...': 85,
+          'Processing speaker labels...': 70,
+          'Generating summary...': 85,
         }
         const progress = progressMap[step] ?? 50
         await cacheJobStatus(args.jobId, { status: 'transcribing', progress })
       },
     })
+
+    const [current] = await db
+      .select({ status: jobs.status, durationSec: jobs.durationSec })
+      .from(jobs)
+      .where(eq(jobs.id, args.jobId))
+      .limit(1)
+
+    if (!current || current.status === 'cancelled') {
+      console.log(`[${args.jobId}] Job cancelled before completion; skipping save and credit reconciliation`)
+      return
+    }
 
     // Store Deepgram-measured duration (authoritative), not the client estimate
     await db
@@ -107,14 +158,18 @@ async function runTranscriptionTask(args: {
       })
       .where(eq(jobs.id, args.jobId))
 
-    // 1 second was already reserved atomically at job creation.
-    // Deduct the remaining (actual - 1). No GREATEST cap — going negative
-    // blocks the user on their next job attempt, which is the correct behaviour.
-    const remaining = actualDuration - 1
-    if (remaining > 0) {
+    // Reconcile the up-front reservation with Deepgram's measured duration.
+    const estimatedDuration = current.durationSec ?? actualDuration
+    const delta = actualDuration - estimatedDuration
+    if (delta < 0) {
       await db
         .update(users)
-        .set({ creditSeconds: sql`${users.creditSeconds} - ${remaining}` })
+        .set({ creditSeconds: sql`${users.creditSeconds} + ${Math.abs(delta)}` })
+        .where(eq(users.id, args.userId))
+    } else if (delta > 0) {
+      await db
+        .update(users)
+        .set({ creditSeconds: sql`GREATEST(${users.creditSeconds} - ${delta}, 0)` })
         .where(eq(users.id, args.userId))
     }
 
@@ -125,15 +180,39 @@ async function runTranscriptionTask(args: {
   } catch (err) {
     console.error('Transcription failed', err)
     const msg = err instanceof Error ? err.message : String(err)
+
+    const [current] = await db
+      .select({ status: jobs.status })
+      .from(jobs)
+      .where(eq(jobs.id, args.jobId))
+      .limit(1)
+
+    if (!current || current.status === 'cancelled') {
+      console.log(`[${args.jobId}] Job cancelled after provider error; leaving cancelled`)
+      return
+    }
+
     await Promise.all([
       db.update(jobs)
         .set({ status: 'failed' satisfies JobStatus, errorMessage: msg })
         .where(eq(jobs.id, args.jobId)),
-      // Refund the 1-second reservation so a transient error doesn't burn credits
-      db.update(users)
-        .set({ creditSeconds: sql`${users.creditSeconds} + 1` })
-        .where(eq(users.id, args.userId)),
+      refundReservedCredits(args.jobId, args.userId),
     ])
     await cacheJobStatus(args.jobId, { status: 'failed', error: msg })
   }
+}
+
+async function refundReservedCredits(jobId: string, userId: string): Promise<void> {
+  const [job] = await db
+    .select({ durationSec: jobs.durationSec, status: jobs.status })
+    .from(jobs)
+    .where(eq(jobs.id, jobId))
+    .limit(1)
+
+  if (!job || job.status === 'cancelled' || !job.durationSec || job.durationSec <= 0) return
+
+  await db
+    .update(users)
+    .set({ creditSeconds: sql`${users.creditSeconds} + ${job.durationSec}` })
+    .where(eq(users.id, userId))
 }

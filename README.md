@@ -3,198 +3,583 @@
 </p>
 
 <p align="center">
-  <strong>ALTO</strong> turns long meeting audio into structured, speaker labeled transcripts in minutes. Built for teams that record more than they have time to listen back to.
+  <strong>ALTO</strong> adalah aplikasi transkrip meeting untuk audio Bahasa Indonesia dan Inggris.
+  Upload audio, dapatkan transkrip berlabel pembicara, ringkasan, export TXT/SRT, dan link publik untuk berbagi.
 </p>
 
 <p align="center">
-  <a href="#run-locally"><img src="https://img.shields.io/badge/run-locally-0a0a0b?style=flat-square&logo=node.js&logoColor=white" alt="Run locally"/></a>
-  <a href="#deploy"><img src="https://img.shields.io/badge/deploy-fly.io%20%2B%20netlify-0a0a0b?style=flat-square" alt="Deploy"/></a>
-  <a href="#stack"><img src="https://img.shields.io/badge/stack-react%20%2B%20hono-0a0a0b?style=flat-square" alt="Stack"/></a>
-  <img src="https://img.shields.io/badge/license-MIT-0a0a0b?style=flat-square" alt="MIT"/>
+  <a href="#jalan-lokal"><img src="https://img.shields.io/badge/local-dev-0a0a0b?style=flat-square&logo=node.js&logoColor=white" alt="Local dev"/></a>
+  <a href="#staging-production"><img src="https://img.shields.io/badge/staging-readying-0a0a0b?style=flat-square" alt="Staging"/></a>
+  <a href="#runtime-aktif"><img src="https://img.shields.io/badge/runtime-Deepgram%20%2B%20OpenAI-0a0a0b?style=flat-square" alt="Runtime"/></a>
+  <a href="#lisensi"><img src="https://img.shields.io/badge/license-MIT-0a0a0b?style=flat-square" alt="MIT"/></a>
 </p>
 
 <br/>
 
-## What it does
+## Status
 
-Drop a meeting recording, get back a clean transcript. Speakers are auto labelled (`Speaker 1`, `Speaker 2`, ...), timestamps are aligned to natural speaker turns, and a short summary is generated alongside. Audio up to 9 hours per file works in a single request thanks to Google Gemini 2.5 Flash. Everything lives behind a login so your transcripts stay private to your team.
-
+```text
+╔══════════════════════════════════════════════════════════════════════╗
+║  STATUS: STAGING HARDENING                                          ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  Production candidate untuk controlled launch.                      ║
+║  Wajib deploy API + worker + object storage untuk production mode.  ║
+║                                                                      ║
+║  Masih belum public-scale sampai test suite dan observability        ║
+║  production lengkap selesai.                                        ║
+╚══════════════════════════════════════════════════════════════════════╝
 ```
-audio file  →  upload  →  ALTO listens  →  transcript with speakers
-                                              + summary
-                                              + export (TXT / SRT)
+
+## Arsitektur Sekarang
+
+```text
+┌──────────────────┐
+│   Browser / PWA   │
+│  React + Vite     │
+└───────┬─────┬────┘
+        │     │ signed PUT audio
+        │     ▼
+        │  ┌──────────────────┐
+        │  │ S3 / R2 Storage   │
+        │  │ durable audio     │
+        │  └────────┬─────────┘
+        │           │ worker reads object
+        ▼           ▼
+┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐
+│     Hono API      │───────▶│   ALTO Worker     │───────▶│  Deepgram Nova 2  │
+│  auth, jobs,      │ queue  │  transcription    │        │ transcription +   │
+│  signed upload,   │ job    │  processor        │◀───────│ diarization       │
+│  credits          │        └────────┬─────────┘        └──────────────────┘
+└───────┬──────────┘                 │
+        │                            │ summary request
+        │                            ▼
+        │                  ┌──────────────────┐
+        │                  │ OpenAI gpt-4o-mini│
+        │                  │ meeting summary   │
+        │                  └──────────────────┘
+        │
+        ├──────────────▶┌──────────────────┐
+        │               │ Postgres / Neon   │
+        │               │ users, sessions,  │
+        │               │ jobs, queue state │
+        │               └──────────────────┘
+        │
+        └──────────────▶┌──────────────────┐
+                        │ Upstash Redis     │
+                        │ progress, stats,  │
+                        │ worker heartbeat  │
+                        └──────────────────┘
+
+Output:
+  ├─ transcript detail
+  ├─ TXT / SRT export
+  └─ public share link: /share/:token
 ```
 
-## Features
+## Runtime Aktif
+
+| Area | Runtime |
+|---|---|
+| Frontend | Vite, React, TypeScript, Tailwind CSS, Framer Motion, Phosphor Icons, Vite PWA |
+| Backend | Node.js, Hono, Drizzle ORM, Zod |
+| Database | Postgres, ditargetkan Neon |
+| Cache | Upstash Redis REST API |
+| Storage | S3-compatible object storage, contoh Cloudflare R2 |
+| Transcription | Deepgram Nova 2 |
+| Summary | OpenAI `gpt-4o-mini` |
+| Deploy | Fly.io untuk backend, Netlify untuk frontend |
+
+Catatan penting: `backend/src/services/gemini.ts` dan `backend/src/services/openai.ts` masih ada sebagai helper legacy/alternatif. Runtime upload aktif sekarang memakai `transcribeWithDeepgram` dari `backend/src/services/deepgram.ts`.
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ Runtime truth                                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│ Transcription aktif : Deepgram Nova 2                               │
+│ Summary aktif       : OpenAI gpt-4o-mini                            │
+│ Gemini              : legacy / experimental helper, bukan runtime   │
+│ Provider switch env : belum ada                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Fitur Saat Ini
 
 | | |
 |---|---|
-| 🎙️  Long audio | Single file up to 9 hours, no manual chunking |
-| 👥  Diarization | Auto detects multiple speakers and keeps labels consistent |
-| 🌐  Bilingual | Bahasa Indonesia and English, auto detect by default |
-| ⚡  Live status | Lottie style progress while ALTO processes |
-| 📋  Exports | One click TXT or SRT subtitle file |
-| 🔐  Team auth | Username and password login, admin manages users |
-| 📱  Mobile first | Built for phone first, looks just as good on desktop |
+| Auth | Login username/password dengan httpOnly cookie |
+| Admin | Kelola user, role admin, reset password, top-up kredit |
+| Kredit | Kredit berbasis detik, reserve estimasi durasi sebelum upload |
+| Reconcile | Durasi aktual Deepgram dipakai untuk refund/deduct selisih |
+| Upload limit | Default staging-safe `100 MB`, configurable via env |
+| Transkrip | Speaker label, timestamp, punctuation, smart formatting |
+| Ringkasan | Summary meeting via OpenAI |
+| Export | Copy semua, copy segmen, TXT, SRT |
+| Share | Link publik `/share/:token` tanpa login |
+| Mobile | UI mobile-first dengan PWA build |
 
-## Stack
+## Yang Belum Production-Wide
 
-* **Frontend** Vite, React, TypeScript, Tailwind, Framer Motion, Lottie. Deploys to Netlify.
-* **Backend** Hono on Node 20, Drizzle ORM, Zod. Deploys to Fly.io.
-* **Database** Neon Postgres with serverless driver.
-* **Cache** Upstash Redis for job status.
-* **STT engine** Google Gemini 2.5 Flash via File API.
+Ini bukan kosmetik. Ini blocker sebelum release besar:
 
-<br/>
+- Upload masih dibuffer di memory API. `MAX_UPLOAD_MB` wajib konservatif sampai object storage dipasang.
+- Production mode wajib `STORAGE_PROVIDER=s3`; fallback API upload hanya untuk local/dev.
+- Worker terpisah wajib dideploy bersama API. Tanpa worker, job direct upload akan berhenti di `queued`.
+- `TRANSCRIPTION_PROVIDER` belum dibaca code. Provider abstraction belum selesai.
+- CSRF token eksplisit belum ada; saat ini mitigasi mengandalkan strict credentialed CORS + JSON requests.
+- Test critical backend belum ada.
+- Metadata transcript belum dipisah penuh ke kolom seperti `speaker_count`, `segment_count`, `summary`.
+
+```text
+╔══════════════════════════════════════════════════════════════════════╗
+║  PRODUCTION READINESS                                               ║
+╠══════════════════════════════╦═══════════════════════════════════════╣
+║  Area                        ║  Status                               ║
+╠══════════════════════════════╬═══════════════════════════════════════╣
+║  Build backend/frontend      ║  PASS                                 ║
+║  Provider docs               ║  PASS - Deepgram + OpenAI faktual     ║
+║  Share link publik           ║  PASS                                 ║
+║  Credit tidak negatif        ║  IMPROVED - reserve estimasi upfront  ║
+║  Cancel running job          ║  IMPROVED - soft cancel + refund      ║
+║  Upload OOM risk             ║  PASS dengan STORAGE_PROVIDER=s3      ║
+║  Durable transcription       ║  PASS dengan worker process           ║
+║  Auth hardening lengkap      ║  PARTIAL - rate limit + strong seed   ║
+║  Health check lengkap        ║  PASS untuk DB/Redis/storage/worker   ║
+║  Automated tests             ║  FAIL - belum ada test critical       ║
+╚══════════════════════════════╩═══════════════════════════════════════╝
+```
+
+## Struktur Project
+
+```text
+ALTO/
+├─ backend/
+│  ├─ src/
+│  │  ├─ db/            schema, migrations, seed
+│  │  ├─ lib/           validate, prompts
+│  │  ├─ middleware/    auth middleware
+│  │  ├─ routes/        auth, users, jobs, upload
+│  │  └─ services/      auth, redis, deepgram, openai, gemini legacy
+│  ├─ Dockerfile
+│  └─ fly.toml
+│
+├─ frontend/
+│  ├─ src/
+│  │  ├─ components/    upload, transcript, nav, status UI
+│  │  ├─ hooks/         auth, upload, polling
+│  │  ├─ lib/           api, format, limits
+│  │  └─ pages/         landing, login, home, job, shared job, admin
+│  └─ netlify.toml
+│
+├─ docs/                banner.svg, logo.svg
+├─ .env.example
+└─ README.md
+```
 
 <p align="center">
-  <img src="docs/logo.svg" alt="A" width="80" />
+  <img src="docs/logo.svg" alt="ALTO logo" width="80" />
 </p>
 
-## Run locally
+## Environment
 
-You need Node 20+ and accounts at [Neon](https://neon.tech), [Upstash](https://upstash.com), and [Google AI Studio](https://aistudio.google.com/app/apikey). All three offer generous free tiers.
-
-**1. Clone and install.**
+`.env.example` berisi contoh backend dan frontend sekaligus. Jangan anggap semua variable aktif global. Buat dua file terpisah:
 
 ```powershell
-git clone https://github.com/<you>/alto.git
-cd alto
+Copy-Item .env.example backend/.env
+Copy-Item .env.example frontend/.env
+```
+
+Isi minimal `backend/.env`:
+
+```bash
+NODE_ENV=development
+PORT=3000
+ALLOWED_ORIGINS=http://localhost:5173
+MAX_UPLOAD_MB=100
+STORAGE_PROVIDER=s3
+S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=alto-staging-uploads
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_FORCE_PATH_STYLE=false
+
+DATABASE_URL=postgres://user:pass@host/db?sslmode=require
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+
+DEEPGRAM_API_KEY=...
+OPENAI_API_KEY=...
+WORKER_POLL_MS=5000
+LOGIN_RATE_LIMIT_MAX=10
+LOGIN_RATE_LIMIT_WINDOW_SEC=900
+
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=change-me-min-8-chars
+```
+
+Isi minimal `frontend/.env`:
+
+```bash
+VITE_API_URL=http://localhost:3000
+VITE_MAX_UPLOAD_MB=100
+```
+
+Jangan tambahkan `JWT_SECRET`, `COOKIE_SECRET`, `REDIS_URL`, `FRONTEND_ORIGIN`, atau `TRANSCRIPTION_PROVIDER` seolah-olah aktif. Nama-nama itu target arsitektur berikutnya, tapi code sekarang belum membacanya.
+
+```text
+┌────────────────────────────┐
+│ Env yang aktif sekarang    │
+├────────────────────────────┤
+│ Backend                    │
+│ - DATABASE_URL             │
+│ - UPSTASH_REDIS_REST_URL   │
+│ - UPSTASH_REDIS_REST_TOKEN │
+│ - DEEPGRAM_API_KEY         │
+│ - OPENAI_API_KEY           │
+│ - ALLOWED_ORIGINS          │
+│ - MAX_UPLOAD_MB            │
+│ - STORAGE_PROVIDER         │
+│ - S3_ENDPOINT              │
+│ - S3_REGION                │
+│ - S3_BUCKET                │
+│ - S3_ACCESS_KEY_ID         │
+│ - S3_SECRET_ACCESS_KEY     │
+│ - WORKER_POLL_MS           │
+│ - LOGIN_RATE_LIMIT_MAX     │
+│ - DEFAULT_ADMIN_USERNAME   │
+│ - DEFAULT_ADMIN_PASSWORD   │
+│                            │
+│ Frontend                   │
+│ - VITE_API_URL             │
+│ - VITE_MAX_UPLOAD_MB       │
+└────────────────────────────┘
+```
+
+## Jalan Lokal
+
+Install dependency:
+
+```powershell
 npm --prefix backend install
 npm --prefix frontend install
 ```
 
-**2. Configure backend env.**
-
-Copy `.env.example` to `backend/.env` and fill in your values.
-
-```bash
-GEMINI_API_KEY=AIzaSy...
-DATABASE_URL=postgresql://...neon.tech/...
-UPSTASH_REDIS_REST_URL=https://....upstash.io
-UPSTASH_REDIS_REST_TOKEN=...
-DEFAULT_ADMIN_USERNAME=yoel
-DEFAULT_ADMIN_PASSWORD=123
-ALLOWED_ORIGINS=http://localhost:5173
-```
-
-**3. Migrate and seed.**
+Jalankan migration setelah `backend/.env` punya `DATABASE_URL` valid:
 
 ```powershell
-cd backend
-npm run db:generate
-npm run db:migrate
-npm run db:seed
+npm --prefix backend run db:migrate
+npm --prefix backend run db:seed
 ```
 
-This creates the admin user `yoel` with password `123`. You can change both later from the admin panel.
+Kalau `DATABASE_URL` belum ada, migrate akan gagal dengan:
 
-**4. Run both servers.**
+```text
+DATABASE_URL is required
+```
+
+Start backend dan frontend:
 
 ```powershell
-# terminal one
 npm --prefix backend run dev
-
-# terminal two
 npm --prefix frontend run dev
 ```
 
-Open http://localhost:5173, log in, upload an audio file. Done.
+Buka:
 
-## Deploy
+```text
+http://localhost:5173
+```
 
-### Backend on Fly.io
+## Script
+
+Root:
 
 ```powershell
-cd backend
-fly launch --no-deploy --copy-config --name alto-api --region sin
-fly secrets set GEMINI_API_KEY=... DATABASE_URL=... UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... DEFAULT_ADMIN_USERNAME=yoel DEFAULT_ADMIN_PASSWORD=123 ALLOWED_ORIGINS=https://your.netlify.app
+npm run dev:backend
+npm run dev:worker
+npm run dev:frontend
+npm run build:backend
+npm run build:frontend
+```
+
+Backend:
+
+```powershell
+npm --prefix backend run db:migrate
+npm --prefix backend run db:seed
+npm --prefix backend run db:generate
+npm --prefix backend run db:studio
+npm --prefix backend run dev:worker
+npm --prefix backend run start:worker
+```
+
+## Flow Job Dan Kredit
+
+1. Frontend membaca metadata audio dan mengirim `durationSec`.
+2. Backend menolak job kalau `credit_seconds < durationSec`.
+3. Backend reserve kredit estimasi secara atomic sebelum upload.
+4. Production mode: frontend upload audio langsung ke S3/R2 signed URL.
+5. Frontend memanggil complete endpoint; backend mengubah job ke `queued`.
+6. Worker mengambil job `queued`, membaca audio dari storage, lalu mengirim ke Deepgram.
+7. Deepgram mengembalikan transcript dan durasi aktual.
+8. Backend reconcile kredit:
+   - aktual lebih pendek: refund selisih.
+   - aktual lebih panjang: deduct selisih tanpa membuat balance negatif.
+9. Kalau upload/transcription gagal, kredit estimasi direfund.
+10. Kalau running job dibatalkan, status jadi `cancelled` dan kredit estimasi direfund.
+
+```text
+┌────────────┐
+│ create job │
+└─────┬──────┘
+      │ require durationSec
+      ▼
+┌──────────────────────┐
+│ atomic credit reserve │
+│ credit >= duration    │
+└─────┬────────────────┘
+      │ signed URL
+      ▼
+┌──────────────┐
+│ direct upload│──fail/cancel──▶┌───────────────┐
+│ to S3 / R2   │                │ refund reserve│
+└─────┬────────┘                └───────────────┘
+      │ complete
+      ▼
+┌────────────┐
+│ queued     │
+└─────┬──────┘
+      │ worker claim
+      ▼
+┌──────────────┐
+│ transcribing │
+└─────┬────────┘
+      │ actual duration
+      ▼
+┌──────────────────────┐
+│ reconcile credit      │
+│ refund / deduct delta │
+└─────┬────────────────┘
+      ▼
+┌───────────┐
+│ completed │
+└───────────┘
+```
+
+## Share Link Publik
+
+Owner klik tombol bagikan di halaman job. Frontend memanggil:
+
+```text
+POST /jobs/:id/share
+```
+
+Backend membuat atau reuse `jobs.share_token`, lalu frontend membuka link:
+
+```text
+/share/<token>
+```
+
+Orang tanpa login bisa melihat transcript melalui:
+
+```text
+GET /jobs/shared/:token
+```
+
+## API Ringkas
+
+Authenticated:
+
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
+- `GET /auth/me/stats`
+- `GET /jobs`
+- `POST /jobs`
+- `GET /jobs/:id`
+- `POST /jobs/:id/share`
+- `DELETE /jobs/:id`
+- `PUT /upload/:jobId`
+- `/users/*` khusus admin
+
+Public:
+
+- `GET /health`
+- `GET /jobs/shared/:token`
+
+## Migration
+
+Migration dijalankan dari backend package. Developer tidak perlu mengedit file SQL manual untuk setup normal.
+
+Sebelum deploy backend yang membawa perubahan schema:
+
+```powershell
+npm --prefix backend run db:migrate
+```
+
+Pastikan target DB benar. Jangan jalankan migration staging ke database production.
+
+## Staging Production
+
+Pisahkan resource staging:
+
+```text
+alto-staging-api
+alto-staging-worker
+alto-staging-web
+alto-staging-db
+alto-staging-redis
+alto-staging-uploads
+```
+
+Pisahkan resource production:
+
+```text
+alto-api
+alto-worker
+alto-web
+alto-db
+alto-redis
+alto-uploads
+```
+
+### Backend Fly.io
+
+Set secret staging:
+
+```powershell
+fly secrets set `
+  NODE_ENV=staging `
+  ALLOWED_ORIGINS=https://your-staging-web `
+  MAX_UPLOAD_MB=100 `
+  STORAGE_PROVIDER=s3 `
+  S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com `
+  S3_REGION=auto `
+  S3_BUCKET=alto-staging-uploads `
+  S3_ACCESS_KEY_ID=... `
+  S3_SECRET_ACCESS_KEY=... `
+  DEEPGRAM_API_KEY=... `
+  OPENAI_API_KEY=... `
+  DATABASE_URL=... `
+  UPSTASH_REDIS_REST_URL=... `
+  UPSTASH_REDIS_REST_TOKEN=... `
+  DEFAULT_ADMIN_USERNAME=admin `
+  DEFAULT_ADMIN_PASSWORD=...
+```
+
+Deploy:
+
+```powershell
 fly deploy
 ```
 
-The `release_command` in `fly.toml` runs migrations and seeds the admin user automatically.
+`backend/fly.toml` menjalankan release command:
 
-### Frontend on Netlify
+```text
+node dist/db/migrate.js && node dist/db/seed.js
+```
 
-1. Push the repo to GitHub.
-2. Connect Netlify to the repo. Base directory `frontend`, build command `npm install && npm run build`, publish `frontend/dist`.
-3. Set env var `VITE_API_URL=https://alto-api.fly.dev`.
-4. Trigger a deploy.
-
-After the Netlify URL is final, update `ALLOWED_ORIGINS` on Fly so the backend trusts the new origin.
+Worker harus dideploy sebagai process/service terpisah dengan env yang sama:
 
 ```powershell
-fly secrets set ALLOWED_ORIGINS=https://alto.netlify.app
+npm --prefix backend run start:worker
 ```
 
-## Architecture
+Untuk Cloudflare R2/S3 bucket, set CORS agar frontend origin boleh `PUT` ke signed URL:
 
-```
-┌──────────────┐        ┌──────────────┐        ┌──────────────────┐
-│   Netlify    │ ◀───▶ │   Fly.io     │ ◀───▶ │   Gemini API     │
-│  React app   │        │  Hono API    │        │   File + STT     │
-└──────────────┘        └──────┬───────┘        └──────────────────┘
-                              │
-                       ┌──────┴───────┐
-                       ▼              ▼
-                 ┌──────────┐   ┌───────────┐
-                 │   Neon   │   │  Upstash  │
-                 │ Postgres │   │   Redis   │
-                 └──────────┘   └───────────┘
+```json
+[
+  {
+    "AllowedOrigins": ["https://your-staging-web"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["etag"],
+    "MaxAgeSeconds": 3600
+  }
+]
 ```
 
-Audio bytes never touch disk on the backend. The browser streams the file straight into Fly, which forwards it to Gemini's resumable file API. The transcript JSON comes back, gets validated, and lands in Postgres.
+### Frontend Netlify
 
-## Folder layout
+Netlify config:
 
-```
-alto/
-├── backend/                  Hono API, Drizzle, Fly.io target
-│   ├── src/
-│   │   ├── routes/           auth, users, jobs, upload, health
-│   │   ├── services/         gemini, auth, redis, db
-│   │   ├── middleware/       requireAuth, requireAdmin
-│   │   └── db/               schema, migrations, seed
-│   ├── Dockerfile
-│   └── fly.toml
-│
-├── frontend/                 Vite + React, Netlify target
-│   ├── public/lottie/        optional Lottie JSON drop in
-│   ├── src/
-│   │   ├── components/       UploadZone, JobStatus, TranscriptViewer, ...
-│   │   ├── pages/            Login, Home, Job, Admin
-│   │   ├── hooks/            useAuth, useUpload, useJobPolling
-│   │   └── lib/              api, format
-│   └── netlify.toml
-│
-├── docs/                     banner.svg, logo.svg
-└── README.md
+- base: `frontend/`
+- build command: `npm install --no-audit --no-fund && npm run build`
+- publish: `dist`
+
+Env frontend staging:
+
+```text
+VITE_API_URL=https://your-staging-api
+VITE_MAX_UPLOAD_MB=100
 ```
 
-## Security notes
+Deploy backend dulu, baru frontend, kalau ada perubahan API/env/database.
 
-* All API keys live in environment variables. Nothing sensitive ships to the browser.
-* Sessions use httpOnly, SameSite Lax cookies with a 30 day sliding window.
-* Passwords are bcrypt hashed at cost 10.
-* The default admin password `123` is for first login. Replace it from the admin panel before going public.
-* The backend deletes the uploaded Gemini file when a job is deleted, so audio does not linger.
+## Definition Of Done Production
 
-## Free tier math
+ALTO baru boleh disebut production-ready setelah daftar ini hijau:
 
-For a team of ten people each uploading ten two hour meetings per month, total monthly cost lands somewhere around:
+```text
+┌──────────────────────────────────────────────┬─────────┐
+│ Requirement                                  │ Status  │
+├──────────────────────────────────────────────┼─────────┤
+│ Staging env terpisah dari production          │ OPS     │
+│ README dan source code sinkron                │ PASS    │
+│ Upload tidak OOM                              │ PASS*   │
+│ Transcription pakai durable worker/queue      │ PASS*   │
+│ Credit tidak bisa negatif                     │ PARTIAL │
+│ Cancel job tidak deduct credit                │ PASS    │
+│ Auth hardened dengan rate limit               │ PASS    │
+│ Progress berasal dari backend                 │ PASS    │
+│ History tidak load transcript besar penuh     │ PARTIAL │
+│ Test critical backend                         │ TODO    │
+│ Health check DB/Redis/worker                  │ PASS*   │
+│ Deploy bisa diulang tanpa manual guessing     │ PARTIAL │
+└──────────────────────────────────────────────┴─────────┘
 
-* **Gemini free tier** zero rupiah, capped at 1500 requests per day
-* **Gemini Flash paid** roughly 23 USD per month
-* **Whisper API** roughly 72 USD per month for the same volume
+*PASS membutuhkan `STORAGE_PROVIDER=s3`, bucket CORS benar, dan worker process
+aktif. Tanpa itu, aplikasi hanya berjalan dalam local/dev fallback mode.
+```
 
-Neon, Upstash, Fly.io and Netlify each have a free tier that covers a small team comfortably.
+## Smoke Test Staging
 
-## License
+Checklist minimal:
 
-MIT. Use it, fork it, ship your own.
+- `backend/.env` atau Fly secrets punya `DATABASE_URL`.
+- `npm --prefix backend run db:migrate` sukses.
+- `npm --prefix backend run db:seed` sukses.
+- Backend `/health` return ok, termasuk `db`, `redis`, `storage`, dan `worker`.
+- Worker process aktif dan heartbeat terlihat di `/health`.
+- Frontend bisa load.
+- Admin login sukses.
+- Password default lemah ditolak di `NODE_ENV=staging`.
+- Test user bisa dibuat dan di-topup.
+- User tanpa kredit cukup tidak bisa start job.
+- Upload kecil selesai.
+- Upload kecil lewat signed URL selesai.
+- Upload di atas `MAX_UPLOAD_MB` ditolak frontend dan backend.
+- Running job cancel mengembalikan kredit estimasi.
+- Transcript selesai bisa dibuka.
+- Share link bisa dibuka tanpa login.
+- Export TXT dan SRT jalan.
+
+## Security Notes
+
+- API key hanya di backend env.
+- Session pakai httpOnly cookie.
+- Password di-hash bcrypt.
+- Admin route dijaga `requireAdmin`.
+- Job read/delete/upload/share owner-scoped.
+- Public transcript hanya lewat token yang sulit ditebak.
+- Production upload memakai signed URL ke object storage. Fallback API upload hanya untuk local/dev.
+
+## Lisensi
+
+MIT.
 
 <br/>
 
 <p align="center">
-  <sub>Made with care for the meetings nobody wants to listen to twice.</sub>
+  <sub>ALTO harus jujur secara arsitektur sebelum tampil percaya diri di production.</sub>
 </p>

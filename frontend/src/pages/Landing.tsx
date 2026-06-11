@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, MicrophoneStage } from '@phosphor-icons/react'
 import { Logo } from '../components/Navbar'
+import { MAX_UPLOAD_MB } from '../lib/limits'
 
 export default function Landing() {
   const navigate = useNavigate()
@@ -33,7 +34,7 @@ export default function Landing() {
           </h1>
 
           <p className="text-[15px] sm:text-base text-zinc-500 leading-relaxed max-w-[46ch] mb-10">
-            Upload audio meeting hingga 9.5 jam. Dapatkan transkrip dengan timestamp dan label
+            Upload audio meeting hingga {MAX_UPLOAD_MB} MB. Dapatkan transkrip dengan timestamp dan label
             pembicara — langsung bisa di-copy atau di-export.
           </p>
 

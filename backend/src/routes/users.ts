@@ -8,12 +8,12 @@ import { requireAdmin, type AppEnv } from '../middleware/auth.js'
 
 const createSchema = z.object({
   username: z.string().min(2).max(64).regex(/^[a-zA-Z0-9_.-]+$/, 'Username hanya huruf, angka, _ . -'),
-  password: z.string().min(3).max(256),
+  password: z.string().min(8, 'Password minimal 8 karakter').max(256),
   isAdmin: z.boolean().optional(),
 })
 
 const passwordSchema = z.object({
-  newPassword: z.string().min(3).max(256),
+  newPassword: z.string().min(8, 'Password minimal 8 karakter').max(256),
 })
 
 const MAX_CREDIT_SECONDS = 315_360_000 // 10 tahun
@@ -77,7 +77,7 @@ usersRouter.patch('/:id/password', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json().catch(() => null)
   const parsed = passwordSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: 'Password minimal 3 karakter' }, 400)
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Password tidak valid' }, 400)
 
   const passwordHash = await hashPassword(parsed.data.newPassword)
   const [updated] = await db

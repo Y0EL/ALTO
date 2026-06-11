@@ -2,8 +2,8 @@ import { useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { UploadSimple, MusicNote, X, Globe, CaretDown } from '@phosphor-icons/react'
 import { formatBytes } from '../lib/format'
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../lib/limits'
 
-const MAX_BYTES = 1.5 * 1024 * 1024 * 1024
 const ACCEPT_EXT = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac']
 
 export type Lang = 'id' | 'en' | 'auto'
@@ -25,8 +25,8 @@ export function UploadZone({ onStart, disabled }: Props) {
     if (!ACCEPT_EXT.includes(ext)) {
       return `Format ${ext} belum didukung. Pakai ${ACCEPT_EXT.join(', ')}`
     }
-    if (f.size > MAX_BYTES) {
-      return `File terlalu besar (${formatBytes(f.size)}). Max 1.5 GB`
+    if (f.size > MAX_UPLOAD_BYTES) {
+      return `File terlalu besar (${formatBytes(f.size)}). Max ${MAX_UPLOAD_MB} MB`
     }
     if (f.size === 0) return 'File kosong'
     return null
@@ -98,7 +98,7 @@ export function UploadZone({ onStart, disabled }: Props) {
             >
               pilih dari perangkat
             </button>
-            . Max 1.5 GB · {ACCEPT_EXT.map((e) => e.slice(1)).join(' · ')}
+            . Max {MAX_UPLOAD_MB} MB · {ACCEPT_EXT.map((e) => e.slice(1)).join(' · ')}
           </p>
 
           <button

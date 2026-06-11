@@ -10,6 +10,13 @@ export interface UploadState {
   error: string | null
 }
 
+interface CreateJobResponse {
+  jobId: string
+  uploadUrl: string
+  uploadMethod?: 'api' | 'direct'
+  completeUrl?: string
+}
+
 export function useUpload() {
   const [state, setState] = useState<UploadState>({
     stage: 'idle',
@@ -29,10 +36,11 @@ export function useUpload() {
     setState({ stage: 'creating', progress: 0, jobId: null, error: null })
 
     try {
-      // Extract audio duration
-      const durationSec = await getAudioDuration(file).catch(() => undefined)
+      const durationSec = await getAudioDuration(file).catch(() => {
+        throw new Error('Durasi audio tidak bisa dibaca. Coba file audio lain.')
+      })
 
-      const { jobId, uploadUrl } = await api.post<{ jobId: string; uploadUrl: string }>('/jobs', {
+      const { jobId, uploadUrl, uploadMethod = 'api', completeUrl } = await api.post<CreateJobResponse>('/jobs', {
         filename: file.name,
         mimeType: file.type || guessMimeFromName(file.name),
         sizeBytes: file.size,
@@ -45,8 +53,8 @@ export function useUpload() {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
         xhrRef.current = xhr
-        xhr.open('PUT', `${api.baseUrl}${uploadUrl}`, true)
-        xhr.withCredentials = true
+        xhr.open('PUT', uploadMethod === 'direct' ? uploadUrl : `${api.baseUrl}${uploadUrl}`, true)
+        xhr.withCredentials = uploadMethod !== 'direct'
         xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
 
         xhr.upload.onprogress = (e) => {
@@ -75,6 +83,11 @@ export function useUpload() {
         xhr.onabort = () => reject(new Error('Upload dibatalkan'))
         xhr.send(file)
       })
+
+      if (uploadMethod === 'direct') {
+        if (!completeUrl) throw new Error('Upload selesai, tapi endpoint finalisasi tidak tersedia')
+        await api.post(completeUrl)
+      }
 
       return jobId
     } catch (err) {

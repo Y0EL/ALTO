@@ -8,6 +8,7 @@ import { HistoryList } from '../components/HistoryList'
 import { useUpload } from '../hooks/useUpload'
 import { useJobPolling } from '../hooks/useJobPolling'
 import { useAuth } from '../hooks/useAuth'
+import { MAX_UPLOAD_MB } from '../lib/limits'
 
 function usePullToRefresh(onRefresh: () => void) {
   const startY = useRef(0)
@@ -126,7 +127,7 @@ export default function Home() {
               <span className="text-zinc-400">Transkrip rapi.</span>
             </h1>
             <p className="mt-5 text-[15px] sm:text-base text-zinc-600 leading-relaxed max-w-[52ch]">
-              Upload audio meeting hingga 9.5 jam. Dapatkan transkrip dengan timestamp dan label
+              Upload audio meeting hingga {MAX_UPLOAD_MB} MB. Dapatkan transkrip dengan timestamp dan label
               pembicara, langsung bisa di-copy atau di-export.
             </p>
           </motion.div>

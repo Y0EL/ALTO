@@ -12,7 +12,13 @@ export const ALLOWED_AUDIO_MIMES = new Set([
   'audio/x-flac',
 ])
 
-export const MAX_FILE_BYTES = 1.5 * 1024 * 1024 * 1024
+const DEFAULT_MAX_UPLOAD_MB = 100
+const configuredMaxUploadMb = Number(process.env.MAX_UPLOAD_MB ?? DEFAULT_MAX_UPLOAD_MB)
+
+export const MAX_FILE_BYTES =
+  Math.max(1, Number.isFinite(configuredMaxUploadMb) ? configuredMaxUploadMb : DEFAULT_MAX_UPLOAD_MB) *
+  1024 *
+  1024
 
 export function isAllowedMime(mime: string): boolean {
   return ALLOWED_AUDIO_MIMES.has(mime.toLowerCase())

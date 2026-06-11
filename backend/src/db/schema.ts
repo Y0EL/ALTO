@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, timestamp, bigint, integer, jsonb, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, boolean, timestamp, bigint, integer, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
@@ -37,16 +37,23 @@ export const jobs = pgTable(
     durationSec: integer('duration_sec'),
     language: text('language').notNull().default('auto'),
     status: text('status').notNull(),
+    storageKey: text('storage_key'),
     geminiFileUri: text('gemini_file_uri'),
     geminiFileName: text('gemini_file_name'),
+    shareToken: text('share_token'),
     transcript: jsonb('transcript').$type<TranscriptPayload | null>(),
     errorMessage: text('error_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }),
+    queuedAt: timestamp('queued_at', { withTimezone: true }),
+    startedAt: timestamp('started_at', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   },
   (t) => ({
     userIdx: index('jobs_user_idx').on(t.userId),
     createdIdx: index('jobs_created_idx').on(t.createdAt),
+    shareTokenIdx: uniqueIndex('jobs_share_token_idx').on(t.shareToken),
   })
 )
 
@@ -54,7 +61,7 @@ export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type Job = typeof jobs.$inferSelect
 
-export type JobStatus = 'pending' | 'uploading' | 'transcribing' | 'completed' | 'failed'
+export type JobStatus = 'pending' | 'uploading' | 'queued' | 'transcribing' | 'completed' | 'failed' | 'cancelled'
 
 export interface TranscriptSegment {
   start: string

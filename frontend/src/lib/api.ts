@@ -66,7 +66,7 @@ export interface JobSummary {
   durationSec: number | null
   sizeBytes: number | null
   language: string
-  status: 'pending' | 'uploading' | 'transcribing' | 'completed' | 'failed'
+  status: 'pending' | 'uploading' | 'queued' | 'transcribing' | 'completed' | 'failed' | 'cancelled'
   createdAt: string
   completedAt: string | null
   speakerCount: number | null
@@ -94,10 +94,18 @@ export interface JobDetail {
   durationSec: number | null
   language: string
   status: JobSummary['status']
+  progress?: number
   transcript: TranscriptPayload | null
   error: string | null
   createdAt: string
   completedAt: string | null
+  cancelledAt?: string | null
+  shareToken?: string | null
+}
+
+export interface ShareJobResponse {
+  shareToken: string
+  sharePath: string
 }
 
 export interface JobStatusPayload {

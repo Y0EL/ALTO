@@ -18,7 +18,9 @@ import { jobsRouter } from './routes/jobs.js'
 import { uploadRouter } from './routes/upload.js'
 import { db } from './db/client.js'
 import { jobs } from './db/schema.js'
-import { inArray } from 'drizzle-orm'
+import { inArray, sql } from 'drizzle-orm'
+import { checkRedis, getWorkerHeartbeat } from './services/redis.js'
+import { checkStorage, isObjectStorageEnabled } from './services/storage.js'
 
 const app = new Hono<AppEnv>()
 
@@ -44,9 +46,43 @@ app.use(
   })
 )
 
-app.get('/health', (c) =>
-  c.json({ ok: true, service: 'audio-to-text-api', time: new Date().toISOString() })
-)
+app.get('/health', async (c) => {
+  const checks = {
+    db: false,
+    redis: false,
+    storage: !isObjectStorageEnabled(),
+    worker: !isObjectStorageEnabled(),
+  }
+
+  try {
+    await db.select({ ok: sql<number>`1` })
+    checks.db = true
+  } catch (err) {
+    console.error('Health DB check failed:', err)
+  }
+
+  checks.redis = await checkRedis()
+
+  if (isObjectStorageEnabled()) {
+    checks.storage = await checkStorage().catch((err) => {
+      console.error('Health storage check failed:', err)
+      return false
+    })
+    const heartbeat = await getWorkerHeartbeat()
+    checks.worker = Boolean(heartbeat && Date.now() - Date.parse(heartbeat.at) < 90_000)
+  }
+
+  const ok = Object.values(checks).every(Boolean)
+  return c.json(
+    {
+      status: ok ? 'ok' : 'degraded',
+      service: 'audio-to-text-api',
+      checks,
+      time: new Date().toISOString(),
+    },
+    ok ? 200 : 503
+  )
+})
 
 app.route('/auth', authRouter)
 app.route('/users', usersRouter)
@@ -58,7 +94,8 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal server error' }, 500)
 })
 
-// On startup: mark any stuck jobs as failed (machine restart mid-transcription)
+// On startup: mark non-durable in-flight uploads as failed. Queued durable
+// storage jobs are owned by the worker process, not the API.
 async function recoverStuckJobs() {
   try {
     const stuck = await db
@@ -67,7 +104,7 @@ async function recoverStuckJobs() {
         status: 'failed',
         errorMessage: 'Server restart saat proses berlangsung. Silakan upload ulang.',
       })
-      .where(inArray(jobs.status, ['transcribing', 'uploading']))
+      .where(inArray(jobs.status, ['uploading']))
       .returning({ id: jobs.id })
 
     if (stuck.length > 0) {
