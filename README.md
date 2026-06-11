@@ -18,8 +18,8 @@
 
 ## Status
 
-> **Production candidate untuk controlled launch.**  
-> Wajib deploy **API + worker + object storage** untuk production mode. Masih belum public-scale sampai test suite dan observability production lengkap selesai.
+> **Ready untuk controlled public launch.**  
+> Wajib deploy **API + worker + object storage** untuk production mode. Belum public-scale sampai test suite dan observability production lengkap selesai.
 
 | Gate | Status |
 |---|---|
@@ -27,8 +27,8 @@
 | DB migration | PASS |
 | Backend health | PASS |
 | Local E2E upload/transcription | PASS |
-| Production signed upload | Needs staging validation |
-| Worker deployment | Required for production |
+| Production API stream upload | PASS |
+| Worker deployment | PASS |
 | Automated critical tests | TODO |
 
 ## Arsitektur Sekarang
@@ -36,7 +36,7 @@
 ```mermaid
 flowchart LR
   Browser["Browser / PWA<br/>React + Vite"]
-  API["Hono API<br/>auth, jobs, signed upload, credits"]
+  API["Hono API<br/>auth, jobs, stream upload, credits"]
   Storage["S3 / R2 Storage<br/>durable audio object"]
   Worker["ALTO Worker<br/>queued job processor"]
   Deepgram["Deepgram Nova 2<br/>transcription + diarization"]
@@ -46,9 +46,8 @@ flowchart LR
   Output["Transcript UI<br/>TXT/SRT export<br/>/share/:token"]
 
   Browser -->|"create job + durationSec"| API
-  API -->|"signed upload URL"| Browser
-  Browser -->|"PUT audio"| Storage
-  Browser -->|"complete upload"| API
+  Browser -->|"PUT audio to API"| API
+  API -->|"stream object"| Storage
   API -->|"queue job"| DB
   Worker -->|"claim queued job"| DB
   Worker -->|"read object"| Storage
@@ -73,7 +72,7 @@ flowchart LR
 | Storage | S3-compatible object storage, contoh Cloudflare R2 |
 | Transcription | Deepgram Nova 2 |
 | Summary | OpenAI `gpt-4o-mini` |
-| Deploy | Fly.io untuk backend/worker, Netlify untuk frontend |
+| Deploy | Fly.io untuk backend/worker, Vercel atau Netlify-compatible untuk frontend |
 
 Catatan penting: `backend/src/services/gemini.ts` dan `backend/src/services/openai.ts` masih ada sebagai helper legacy/alternatif. Runtime upload aktif sekarang memakai `transcribeWithDeepgram` dari `backend/src/services/deepgram.ts`.
 
@@ -118,7 +117,7 @@ flowchart TB
 | History query | PARTIAL | Tidak load transcript penuh, tapi metadata columns belum lengkap |
 | Automated tests | TODO | Critical test suite belum ada |
 
-`PASS*` berarti wajib ada S3/R2 config valid, bucket CORS benar, dan worker process aktif. Tanpa itu, app hanya masuk local/dev fallback mode.
+`PASS*` berarti wajib ada S3/R2 config valid dan worker process aktif. R2 CORS hanya wajib jika `BROWSER_DIRECT_UPLOAD=true`; default production path memakai API streaming upload.
 
 ## Yang Masih Perlu Sebelum Public-Scale
 
@@ -133,30 +132,29 @@ flowchart TB
 
 ```text
 ALTO/
-├─ backend/
-│  ├─ src/
-│  │  ├─ db/            schema, migrations, seed
-│  │  ├─ lib/           validate, prompts
-│  │  ├─ middleware/    auth middleware
-│  │  ├─ routes/        auth, users, jobs, upload
-│  │  ├─ services/      auth, redis, storage, deepgram, transcription
-│  │  └─ worker.ts      queued transcription worker
-│  ├─ Dockerfile
-│  └─ fly.toml
-│
-├─ frontend/
-│  ├─ src/
-│  │  ├─ components/    upload, transcript, nav, status UI
-│  │  ├─ hooks/         auth, upload, polling
-│  │  ├─ lib/           api, format, limits
-│  │  └─ pages/         landing, login, home, job, shared job, admin
-│  └─ netlify.toml
-│
-├─ docs/                banner.svg, logo.svg
-├─ .env.example
-└─ README.md
+|-- backend/
+|   |-- src/
+|   |   |-- db/            schema, migrations, seed
+|   |   |-- lib/           validate, prompts
+|   |   |-- middleware/    auth middleware
+|   |   |-- routes/        auth, users, jobs, upload
+|   |   |-- services/      auth, redis, storage, deepgram, transcription
+|   |   `-- worker.ts      queued transcription worker
+|   |-- Dockerfile
+|   `-- fly.toml
+|
+|-- frontend/
+|   |-- src/
+|   |   |-- components/    upload, transcript, nav, status UI
+|   |   |-- hooks/         auth, upload, polling
+|   |   |-- lib/           api, format, limits
+|   |   `-- pages/         landing, login, home, job, shared job, admin
+|   `-- netlify.toml
+|
+|-- docs/                banner.svg, logo.svg
+|-- .env.example
+`-- README.md
 ```
-
 <p align="center">
   <img src="docs/logo.svg" alt="ALTO logo" width="80" />
 </p>
@@ -294,9 +292,9 @@ sequenceDiagram
 
   U->>API: POST /jobs {durationSec, sizeBytes}
   API->>DB: atomic reserve credit
-  API-->>U: signed upload URL
-  U->>S: PUT audio
-  U->>API: POST /upload/:jobId/complete
+  API-->>U: API upload URL
+  U->>API: PUT audio
+  API->>S: stream audio object
   API->>DB: status = queued
   W->>DB: claim queued job
   W->>S: read audio object
@@ -418,16 +416,17 @@ fly secrets set `
   DEFAULT_ADMIN_PASSWORD=...
 ```
 
-Deploy API:
+Deploy backend + worker process:
 
 ```powershell
-fly deploy
+cd backend
+fly deploy -a alto --config fly.toml
 ```
 
-Worker harus dideploy sebagai process/service terpisah dengan env yang sama:
+Pastikan process group aktif:
 
 ```powershell
-npm --prefix backend run start:worker
+fly scale count app=1 worker=1 -a alto
 ```
 
 Default production upload ALTO tidak butuh R2 CORS karena browser upload ke API, lalu API stream ke R2 tanpa buffer penuh di memory. Kalau `BROWSER_DIRECT_UPLOAD=true`, set CORS agar frontend origin boleh `PUT` ke signed URL:
@@ -444,9 +443,9 @@ Default production upload ALTO tidak butuh R2 CORS karena browser upload ke API,
 ]
 ```
 
-### Frontend Netlify
+### Frontend Vercel / Netlify
 
-Netlify config:
+Config frontend:
 
 - base: `frontend/`
 - build command: `npm install --no-audit --no-fund && npm run build`
@@ -498,5 +497,5 @@ MIT.
 <br/>
 
 <p align="center">
-  <sub>ALTO harus jujur secara arsitektur sebelum tampil percaya diri di production.</sub>
+  <sub>ALTO product by Manoppo Workflow Studio</sub>
 </p>
