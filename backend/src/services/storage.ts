@@ -13,6 +13,10 @@ export function isObjectStorageEnabled(): boolean {
   return process.env.STORAGE_PROVIDER === 's3'
 }
 
+export function isObjectStorageRequired(): boolean {
+  return process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging'
+}
+
 function bucket(): string {
   const value = process.env.S3_BUCKET
   if (!value) throw new Error('S3_BUCKET is required when STORAGE_PROVIDER=s3')
@@ -31,7 +35,7 @@ function client(): S3Client {
   return new S3Client({
     region,
     endpoint,
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+    forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
     credentials: { accessKeyId, secretAccessKey },
   })
 }

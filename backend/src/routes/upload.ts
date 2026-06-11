@@ -5,7 +5,7 @@ import { jobs, users, type JobStatus, type TranscriptPayload } from '../db/schem
 import { requireAuth, type AppEnv } from '../middleware/auth.js'
 import { transcribeWithDeepgram } from '../services/deepgram.js'
 import { cacheJobStatus, invalidateUserStats } from '../services/redis.js'
-import { isObjectStorageEnabled } from '../services/storage.js'
+import { isObjectStorageEnabled, isObjectStorageRequired } from '../services/storage.js'
 
 export const uploadRouter = new Hono<AppEnv>()
 
@@ -41,7 +41,7 @@ uploadRouter.post('/:jobId/complete', async (c) => {
 })
 
 uploadRouter.put('/:jobId', async (c) => {
-  if (isObjectStorageEnabled()) {
+  if (isObjectStorageEnabled() || isObjectStorageRequired()) {
     return c.json({ error: 'Direct object storage upload aktif. Gunakan signed upload URL.' }, 409)
   }
 

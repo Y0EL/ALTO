@@ -11,6 +11,10 @@ primary_region = "sin"
 [deploy]
   release_command = "node dist/db/migrate.js && node dist/db/seed.js"
 
+[processes]
+  app = "node dist/index.js"
+  worker = "node dist/worker.js"
+
 [http_service]
   internal_port = 3000
   force_https = true
@@ -33,7 +37,7 @@ primary_region = "sin"
     interval = "60s"
     method = "GET"
     timeout = "10s"
-    path = "/health"
+    path = "/health/live"
 
 [[vm]]
   cpu_kind = "shared"

@@ -8,7 +8,7 @@ import { requireAuth, type AppEnv } from '../middleware/auth.js'
 import { isAllowedMime, normalizeMime, MAX_FILE_BYTES } from '../lib/validate.js'
 import { deleteGeminiFile } from '../services/gemini.js'
 import { cacheJobStatus, getCachedJobStatus } from '../services/redis.js'
-import { createUploadUrl, isObjectStorageEnabled } from '../services/storage.js'
+import { createUploadUrl, isObjectStorageEnabled, isObjectStorageRequired } from '../services/storage.js'
 
 const createSchema = z.object({
   filename: z.string().min(1).max(255),
@@ -57,6 +57,13 @@ jobsRouter.post('/', async (c) => {
 
   const jobId = nanoid()
   const storageEnabled = isObjectStorageEnabled()
+  if (!storageEnabled && isObjectStorageRequired()) {
+    await db
+      .update(users)
+      .set({ creditSeconds: sql`${users.creditSeconds} + ${parsed.data.durationSec}` })
+      .where(eq(users.id, user.id))
+    return c.json({ error: 'Object storage belum aktif. Production upload dinonaktifkan.' }, 503)
+  }
   const storageKey = storageEnabled ? `uploads/${user.id}/${jobId}/${parsed.data.filename}` : null
 
   let created: typeof jobs.$inferSelect

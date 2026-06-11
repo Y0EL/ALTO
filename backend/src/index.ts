@@ -20,7 +20,7 @@ import { db } from './db/client.js'
 import { jobs } from './db/schema.js'
 import { inArray, sql } from 'drizzle-orm'
 import { checkRedis, getWorkerHeartbeat } from './services/redis.js'
-import { checkStorage, isObjectStorageEnabled } from './services/storage.js'
+import { checkStorage, isObjectStorageEnabled, isObjectStorageRequired } from './services/storage.js'
 
 const app = new Hono<AppEnv>()
 
@@ -46,29 +46,48 @@ app.use(
   })
 )
 
+app.get('/health/live', (c) => {
+  return c.json({
+    status: 'ok',
+    service: 'audio-to-text-api',
+    time: new Date().toISOString(),
+  })
+})
+
 app.get('/health', async (c) => {
   const checks = {
     db: false,
     redis: false,
-    storage: !isObjectStorageEnabled(),
-    worker: !isObjectStorageEnabled(),
+    storage: !isObjectStorageRequired(),
+    worker: !isObjectStorageRequired(),
   }
 
   try {
-    await db.select({ ok: sql<number>`1` })
+    await withTimeout(
+      (async () => {
+        await db.select({ ok: sql<number>`1` })
+      })(),
+      5000
+    )
     checks.db = true
   } catch (err) {
     console.error('Health DB check failed:', err)
   }
 
-  checks.redis = await checkRedis()
+  checks.redis = await withTimeout(checkRedis(), 5000).catch((err) => {
+    console.error('Health Redis check failed:', err)
+    return false
+  })
 
   if (isObjectStorageEnabled()) {
-    checks.storage = await checkStorage().catch((err) => {
+    checks.storage = await withTimeout(checkStorage(), 5000).catch((err) => {
       console.error('Health storage check failed:', err)
       return false
     })
-    const heartbeat = await getWorkerHeartbeat()
+    const heartbeat = await withTimeout(getWorkerHeartbeat(), 5000).catch((err) => {
+      console.error('Health worker heartbeat check failed:', err)
+      return null
+    })
     checks.worker = Boolean(heartbeat && Date.now() - Date.parse(heartbeat.at) < 90_000)
   }
 
@@ -83,6 +102,15 @@ app.get('/health', async (c) => {
     ok ? 200 : 503
   )
 })
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
+    promise
+      .then(resolve, reject)
+      .finally(() => clearTimeout(timer))
+  })
+}
 
 app.route('/auth', authRouter)
 app.route('/users', usersRouter)

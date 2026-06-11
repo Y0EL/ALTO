@@ -184,7 +184,7 @@ S3_REGION=auto
 S3_BUCKET=alto-staging-uploads
 S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
-S3_FORCE_PATH_STYLE=false
+S3_FORCE_PATH_STYLE=true
 
 DATABASE_URL=postgres://user:pass@host/db?sslmode=require
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
