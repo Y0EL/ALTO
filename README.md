@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="#jalan-lokal"><img src="https://img.shields.io/badge/local-dev-0a0a0b?style=flat-square&logo=node.js&logoColor=white" alt="Local dev"/></a>
-  <a href="#staging-production"><img src="https://img.shields.io/badge/staging-readying-0a0a0b?style=flat-square" alt="Staging"/></a>
+  <a href="#staging-production"><img src="https://img.shields.io/badge/staging-production-0a0a0b?style=flat-square" alt="Staging"/></a>
   <a href="#runtime-aktif"><img src="https://img.shields.io/badge/runtime-Deepgram%20%2B%20OpenAI-0a0a0b?style=flat-square" alt="Runtime"/></a>
   <a href="#lisensi"><img src="https://img.shields.io/badge/license-MIT-0a0a0b?style=flat-square" alt="MIT"/></a>
 </p>
@@ -18,62 +18,47 @@
 
 ## Status
 
-```text
-╔══════════════════════════════════════════════════════════════════════╗
-║  STATUS: STAGING HARDENING                                          ║
-╠══════════════════════════════════════════════════════════════════════╣
-║  Production candidate untuk controlled launch.                      ║
-║  Wajib deploy API + worker + object storage untuk production mode.  ║
-║                                                                      ║
-║  Masih belum public-scale sampai test suite dan observability        ║
-║  production lengkap selesai.                                        ║
-╚══════════════════════════════════════════════════════════════════════╝
-```
+> **Production candidate untuk controlled launch.**  
+> Wajib deploy **API + worker + object storage** untuk production mode. Masih belum public-scale sampai test suite dan observability production lengkap selesai.
+
+| Gate | Status |
+|---|---|
+| Local build | PASS |
+| DB migration | PASS |
+| Backend health | PASS |
+| Local E2E upload/transcription | PASS |
+| Production signed upload | Needs staging validation |
+| Worker deployment | Required for production |
+| Automated critical tests | TODO |
 
 ## Arsitektur Sekarang
 
-```text
-┌──────────────────┐
-│   Browser / PWA   │
-│  React + Vite     │
-└───────┬─────┬────┘
-        │     │ signed PUT audio
-        │     ▼
-        │  ┌──────────────────┐
-        │  │ S3 / R2 Storage   │
-        │  │ durable audio     │
-        │  └────────┬─────────┘
-        │           │ worker reads object
-        ▼           ▼
-┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐
-│     Hono API      │───────▶│   ALTO Worker     │───────▶│  Deepgram Nova 2  │
-│  auth, jobs,      │ queue  │  transcription    │        │ transcription +   │
-│  signed upload,   │ job    │  processor        │◀───────│ diarization       │
-│  credits          │        └────────┬─────────┘        └──────────────────┘
-└───────┬──────────┘                 │
-        │                            │ summary request
-        │                            ▼
-        │                  ┌──────────────────┐
-        │                  │ OpenAI gpt-4o-mini│
-        │                  │ meeting summary   │
-        │                  └──────────────────┘
-        │
-        ├──────────────▶┌──────────────────┐
-        │               │ Postgres / Neon   │
-        │               │ users, sessions,  │
-        │               │ jobs, queue state │
-        │               └──────────────────┘
-        │
-        └──────────────▶┌──────────────────┐
-                        │ Upstash Redis     │
-                        │ progress, stats,  │
-                        │ worker heartbeat  │
-                        └──────────────────┘
+```mermaid
+flowchart LR
+  Browser["Browser / PWA<br/>React + Vite"]
+  API["Hono API<br/>auth, jobs, signed upload, credits"]
+  Storage["S3 / R2 Storage<br/>durable audio object"]
+  Worker["ALTO Worker<br/>queued job processor"]
+  Deepgram["Deepgram Nova 2<br/>transcription + diarization"]
+  OpenAI["OpenAI gpt-4o-mini<br/>meeting summary"]
+  DB["Postgres / Neon<br/>users, sessions, jobs, queue state"]
+  Redis["Upstash Redis<br/>progress, stats, worker heartbeat"]
+  Output["Transcript UI<br/>TXT/SRT export<br/>/share/:token"]
 
-Output:
-  ├─ transcript detail
-  ├─ TXT / SRT export
-  └─ public share link: /share/:token
+  Browser -->|"create job + durationSec"| API
+  API -->|"signed upload URL"| Browser
+  Browser -->|"PUT audio"| Storage
+  Browser -->|"complete upload"| API
+  API -->|"queue job"| DB
+  Worker -->|"claim queued job"| DB
+  Worker -->|"read object"| Storage
+  Worker --> Deepgram
+  Worker --> OpenAI
+  Worker -->|"save transcript/status"| DB
+  API --> Redis
+  Worker --> Redis
+  Browser -->|"poll job"| API
+  API --> Output
 ```
 
 ## Runtime Aktif
@@ -81,72 +66,68 @@ Output:
 | Area | Runtime |
 |---|---|
 | Frontend | Vite, React, TypeScript, Tailwind CSS, Framer Motion, Phosphor Icons, Vite PWA |
-| Backend | Node.js, Hono, Drizzle ORM, Zod |
+| Backend API | Node.js, Hono, Drizzle ORM, Zod |
+| Worker | Node.js worker process polling queued jobs |
 | Database | Postgres, ditargetkan Neon |
 | Cache | Upstash Redis REST API |
 | Storage | S3-compatible object storage, contoh Cloudflare R2 |
 | Transcription | Deepgram Nova 2 |
 | Summary | OpenAI `gpt-4o-mini` |
-| Deploy | Fly.io untuk backend, Netlify untuk frontend |
+| Deploy | Fly.io untuk backend/worker, Netlify untuk frontend |
 
 Catatan penting: `backend/src/services/gemini.ts` dan `backend/src/services/openai.ts` masih ada sebagai helper legacy/alternatif. Runtime upload aktif sekarang memakai `transcribeWithDeepgram` dari `backend/src/services/deepgram.ts`.
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ Runtime truth                                                       │
-├─────────────────────────────────────────────────────────────────────┤
-│ Transcription aktif : Deepgram Nova 2                               │
-│ Summary aktif       : OpenAI gpt-4o-mini                            │
-│ Gemini              : legacy / experimental helper, bukan runtime   │
-│ Provider switch env : belum ada                                     │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  Runtime["Runtime Truth"]
+  Runtime --> DG["Transcription aktif: Deepgram Nova 2"]
+  Runtime --> OA["Summary aktif: OpenAI gpt-4o-mini"]
+  Runtime --> GM["Gemini: legacy / experimental helper"]
+  Runtime --> PS["Provider switch env: belum aktif"]
 ```
 
 ## Fitur Saat Ini
 
-| | |
+| Area | Fitur |
 |---|---|
 | Auth | Login username/password dengan httpOnly cookie |
 | Admin | Kelola user, role admin, reset password, top-up kredit |
 | Kredit | Kredit berbasis detik, reserve estimasi durasi sebelum upload |
 | Reconcile | Durasi aktual Deepgram dipakai untuk refund/deduct selisih |
-| Upload limit | Default staging-safe `100 MB`, configurable via env |
+| Upload | Production mode memakai signed URL ke S3/R2 |
+| Worker | Job `queued` diproses worker terpisah |
 | Transkrip | Speaker label, timestamp, punctuation, smart formatting |
 | Ringkasan | Summary meeting via OpenAI |
 | Export | Copy semua, copy segmen, TXT, SRT |
 | Share | Link publik `/share/:token` tanpa login |
 | Mobile | UI mobile-first dengan PWA build |
 
-## Yang Belum Production-Wide
+## Production Readiness
 
-Ini bukan kosmetik. Ini blocker sebelum release besar:
+| Area | Status | Catatan |
+|---|---|---|
+| Build backend/frontend | PASS | `npm run build:backend`, `npm run build:frontend` |
+| Provider docs | PASS | Deepgram + OpenAI faktual |
+| Share link publik | PASS | Public token route tersedia |
+| Credit tidak negatif | PARTIAL | Reserve estimasi upfront; audit log belum ada |
+| Cancel running job | PASS | Soft cancel + refund estimasi |
+| Upload OOM risk | PASS* | PASS jika `STORAGE_PROVIDER=s3` aktif |
+| Durable transcription | PASS* | PASS jika worker process dideploy |
+| Auth hardening | PARTIAL | Rate limit + strong seed; CSRF token eksplisit belum ada |
+| Health check | PASS* | DB/Redis/storage/worker dicek |
+| History query | PARTIAL | Tidak load transcript penuh, tapi metadata columns belum lengkap |
+| Automated tests | TODO | Critical test suite belum ada |
 
-- Upload masih dibuffer di memory API. `MAX_UPLOAD_MB` wajib konservatif sampai object storage dipasang.
-- Production mode wajib `STORAGE_PROVIDER=s3`; fallback API upload hanya untuk local/dev.
-- Worker terpisah wajib dideploy bersama API. Tanpa worker, job direct upload akan berhenti di `queued`.
-- `TRANSCRIPTION_PROVIDER` belum dibaca code. Provider abstraction belum selesai.
-- CSRF token eksplisit belum ada; saat ini mitigasi mengandalkan strict credentialed CORS + JSON requests.
-- Test critical backend belum ada.
-- Metadata transcript belum dipisah penuh ke kolom seperti `speaker_count`, `segment_count`, `summary`.
+`PASS*` berarti wajib ada S3/R2 config valid, bucket CORS benar, dan worker process aktif. Tanpa itu, app hanya masuk local/dev fallback mode.
 
-```text
-╔══════════════════════════════════════════════════════════════════════╗
-║  PRODUCTION READINESS                                               ║
-╠══════════════════════════════╦═══════════════════════════════════════╣
-║  Area                        ║  Status                               ║
-╠══════════════════════════════╬═══════════════════════════════════════╣
-║  Build backend/frontend      ║  PASS                                 ║
-║  Provider docs               ║  PASS - Deepgram + OpenAI faktual     ║
-║  Share link publik           ║  PASS                                 ║
-║  Credit tidak negatif        ║  IMPROVED - reserve estimasi upfront  ║
-║  Cancel running job          ║  IMPROVED - soft cancel + refund      ║
-║  Upload OOM risk             ║  PASS dengan STORAGE_PROVIDER=s3      ║
-║  Durable transcription       ║  PASS dengan worker process           ║
-║  Auth hardening lengkap      ║  PARTIAL - rate limit + strong seed   ║
-║  Health check lengkap        ║  PASS untuk DB/Redis/storage/worker   ║
-║  Automated tests             ║  FAIL - belum ada test critical       ║
-╚══════════════════════════════╩═══════════════════════════════════════╝
-```
+## Yang Masih Perlu Sebelum Public-Scale
+
+- Test critical backend: auth, credit, cancel, worker claim, share route, transcript export.
+- CSRF token eksplisit untuk mutating cookie requests.
+- Credit/billing audit log.
+- Metadata kolom terpisah: `speaker_count`, `segment_count`, `summary`.
+- Observability production yang lebih lengkap: structured logs, request ID, alerting.
+- Provider abstraction jika nanti ingin fallback selain Deepgram.
 
 ## Struktur Project
 
@@ -158,7 +139,8 @@ ALTO/
 │  │  ├─ lib/           validate, prompts
 │  │  ├─ middleware/    auth middleware
 │  │  ├─ routes/        auth, users, jobs, upload
-│  │  └─ services/      auth, redis, deepgram, openai, gemini legacy
+│  │  ├─ services/      auth, redis, storage, deepgram, transcription
+│  │  └─ worker.ts      queued transcription worker
 │  ├─ Dockerfile
 │  └─ fly.toml
 │
@@ -188,13 +170,14 @@ Copy-Item .env.example backend/.env
 Copy-Item .env.example frontend/.env
 ```
 
-Isi minimal `backend/.env`:
+Isi minimal `backend/.env` untuk production mode:
 
 ```bash
-NODE_ENV=development
+NODE_ENV=staging
 PORT=3000
-ALLOWED_ORIGINS=http://localhost:5173
+ALLOWED_ORIGINS=https://your-frontend-domain
 MAX_UPLOAD_MB=100
+
 STORAGE_PROVIDER=s3
 S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 S3_REGION=auto
@@ -209,6 +192,7 @@ UPSTASH_REDIS_REST_TOKEN=...
 
 DEEPGRAM_API_KEY=...
 OPENAI_API_KEY=...
+
 WORKER_POLL_MS=5000
 LOGIN_RATE_LIMIT_MAX=10
 LOGIN_RATE_LIMIT_WINDOW_SEC=900
@@ -220,39 +204,21 @@ DEFAULT_ADMIN_PASSWORD=change-me-min-8-chars
 Isi minimal `frontend/.env`:
 
 ```bash
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=https://your-api-domain
 VITE_MAX_UPLOAD_MB=100
 ```
 
 Jangan tambahkan `JWT_SECRET`, `COOKIE_SECRET`, `REDIS_URL`, `FRONTEND_ORIGIN`, atau `TRANSCRIPTION_PROVIDER` seolah-olah aktif. Nama-nama itu target arsitektur berikutnya, tapi code sekarang belum membacanya.
 
-```text
-┌────────────────────────────┐
-│ Env yang aktif sekarang    │
-├────────────────────────────┤
-│ Backend                    │
-│ - DATABASE_URL             │
-│ - UPSTASH_REDIS_REST_URL   │
-│ - UPSTASH_REDIS_REST_TOKEN │
-│ - DEEPGRAM_API_KEY         │
-│ - OPENAI_API_KEY           │
-│ - ALLOWED_ORIGINS          │
-│ - MAX_UPLOAD_MB            │
-│ - STORAGE_PROVIDER         │
-│ - S3_ENDPOINT              │
-│ - S3_REGION                │
-│ - S3_BUCKET                │
-│ - S3_ACCESS_KEY_ID         │
-│ - S3_SECRET_ACCESS_KEY     │
-│ - WORKER_POLL_MS           │
-│ - LOGIN_RATE_LIMIT_MAX     │
-│ - DEFAULT_ADMIN_USERNAME   │
-│ - DEFAULT_ADMIN_PASSWORD   │
-│                            │
-│ Frontend                   │
-│ - VITE_API_URL             │
-│ - VITE_MAX_UPLOAD_MB       │
-└────────────────────────────┘
+```mermaid
+flowchart LR
+  BackendEnv["Backend env"] --> DB["DATABASE_URL"]
+  BackendEnv --> Redis["UPSTASH_REDIS_REST_URL/TOKEN"]
+  BackendEnv --> Provider["DEEPGRAM_API_KEY<br/>OPENAI_API_KEY"]
+  BackendEnv --> Storage["STORAGE_PROVIDER=s3<br/>S3_*"]
+  BackendEnv --> Security["ALLOWED_ORIGINS<br/>LOGIN_RATE_LIMIT_*"]
+  FrontendEnv["Frontend env"] --> API["VITE_API_URL"]
+  FrontendEnv --> Limit["VITE_MAX_UPLOAD_MB"]
 ```
 
 ## Jalan Lokal
@@ -271,17 +237,17 @@ npm --prefix backend run db:migrate
 npm --prefix backend run db:seed
 ```
 
-Kalau `DATABASE_URL` belum ada, migrate akan gagal dengan:
-
-```text
-DATABASE_URL is required
-```
-
-Start backend dan frontend:
+Start local fallback mode:
 
 ```powershell
 npm --prefix backend run dev
 npm --prefix frontend run dev
+```
+
+Start worker untuk production-like mode:
+
+```powershell
+npm --prefix backend run dev:worker
 ```
 
 Buka:
@@ -315,56 +281,39 @@ npm --prefix backend run start:worker
 
 ## Flow Job Dan Kredit
 
+```mermaid
+sequenceDiagram
+  participant U as User / Browser
+  participant API as Hono API
+  participant S as S3 / R2
+  participant DB as Postgres
+  participant W as Worker
+  participant DG as Deepgram
+  participant OA as OpenAI
+
+  U->>API: POST /jobs {durationSec, sizeBytes}
+  API->>DB: atomic reserve credit
+  API-->>U: signed upload URL
+  U->>S: PUT audio
+  U->>API: POST /upload/:jobId/complete
+  API->>DB: status = queued
+  W->>DB: claim queued job
+  W->>S: read audio object
+  W->>DG: transcribe + diarize
+  W->>OA: generate summary
+  W->>DB: save transcript + completed
+  W->>DB: reconcile credit delta
+  U->>API: poll /jobs/:id
+  API-->>U: transcript/status
+```
+
+Credit rules:
+
 1. Frontend membaca metadata audio dan mengirim `durationSec`.
 2. Backend menolak job kalau `credit_seconds < durationSec`.
 3. Backend reserve kredit estimasi secara atomic sebelum upload.
-4. Production mode: frontend upload audio langsung ke S3/R2 signed URL.
-5. Frontend memanggil complete endpoint; backend mengubah job ke `queued`.
-6. Worker mengambil job `queued`, membaca audio dari storage, lalu mengirim ke Deepgram.
-7. Deepgram mengembalikan transcript dan durasi aktual.
-8. Backend reconcile kredit:
-   - aktual lebih pendek: refund selisih.
-   - aktual lebih panjang: deduct selisih tanpa membuat balance negatif.
-9. Kalau upload/transcription gagal, kredit estimasi direfund.
-10. Kalau running job dibatalkan, status jadi `cancelled` dan kredit estimasi direfund.
-
-```text
-┌────────────┐
-│ create job │
-└─────┬──────┘
-      │ require durationSec
-      ▼
-┌──────────────────────┐
-│ atomic credit reserve │
-│ credit >= duration    │
-└─────┬────────────────┘
-      │ signed URL
-      ▼
-┌──────────────┐
-│ direct upload│──fail/cancel──▶┌───────────────┐
-│ to S3 / R2   │                │ refund reserve│
-└─────┬────────┘                └───────────────┘
-      │ complete
-      ▼
-┌────────────┐
-│ queued     │
-└─────┬──────┘
-      │ worker claim
-      ▼
-┌──────────────┐
-│ transcribing │
-└─────┬────────┘
-      │ actual duration
-      ▼
-┌──────────────────────┐
-│ reconcile credit      │
-│ refund / deduct delta │
-└─────┬────────────────┘
-      ▼
-┌───────────┐
-│ completed │
-└───────────┘
-```
+4. Worker reconcile dengan durasi aktual dari Deepgram.
+5. Gagal/cancel akan refund estimasi sesuai status job.
 
 ## Share Link Publik
 
@@ -399,7 +348,8 @@ Authenticated:
 - `GET /jobs/:id`
 - `POST /jobs/:id/share`
 - `DELETE /jobs/:id`
-- `PUT /upload/:jobId`
+- `POST /upload/:jobId/complete`
+- `PUT /upload/:jobId` local/dev fallback only
 - `/users/*` khusus admin
 
 Public:
@@ -467,16 +417,10 @@ fly secrets set `
   DEFAULT_ADMIN_PASSWORD=...
 ```
 
-Deploy:
+Deploy API:
 
 ```powershell
 fly deploy
-```
-
-`backend/fly.toml` menjalankan release command:
-
-```text
-node dist/db/migrate.js && node dist/db/seed.js
 ```
 
 Worker harus dideploy sebagai process/service terpisah dengan env yang sama:
@@ -514,52 +458,23 @@ VITE_API_URL=https://your-staging-api
 VITE_MAX_UPLOAD_MB=100
 ```
 
-Deploy backend dulu, baru frontend, kalau ada perubahan API/env/database.
-
-## Definition Of Done Production
-
-ALTO baru boleh disebut production-ready setelah daftar ini hijau:
-
-```text
-┌──────────────────────────────────────────────┬─────────┐
-│ Requirement                                  │ Status  │
-├──────────────────────────────────────────────┼─────────┤
-│ Staging env terpisah dari production          │ OPS     │
-│ README dan source code sinkron                │ PASS    │
-│ Upload tidak OOM                              │ PASS*   │
-│ Transcription pakai durable worker/queue      │ PASS*   │
-│ Credit tidak bisa negatif                     │ PARTIAL │
-│ Cancel job tidak deduct credit                │ PASS    │
-│ Auth hardened dengan rate limit               │ PASS    │
-│ Progress berasal dari backend                 │ PASS    │
-│ History tidak load transcript besar penuh     │ PARTIAL │
-│ Test critical backend                         │ TODO    │
-│ Health check DB/Redis/worker                  │ PASS*   │
-│ Deploy bisa diulang tanpa manual guessing     │ PARTIAL │
-└──────────────────────────────────────────────┴─────────┘
-
-*PASS membutuhkan `STORAGE_PROVIDER=s3`, bucket CORS benar, dan worker process
-aktif. Tanpa itu, aplikasi hanya berjalan dalam local/dev fallback mode.
-```
+Deploy backend dulu, deploy worker, lalu frontend.
 
 ## Smoke Test Staging
 
 Checklist minimal:
 
-- `backend/.env` atau Fly secrets punya `DATABASE_URL`.
 - `npm --prefix backend run db:migrate` sukses.
 - `npm --prefix backend run db:seed` sukses.
-- Backend `/health` return ok, termasuk `db`, `redis`, `storage`, dan `worker`.
-- Worker process aktif dan heartbeat terlihat di `/health`.
+- Backend `/health` return `status: ok`.
+- `/health` checks: `db`, `redis`, `storage`, `worker` semuanya `true`.
+- Worker process aktif.
 - Frontend bisa load.
 - Admin login sukses.
-- Password default lemah ditolak di `NODE_ENV=staging`.
 - Test user bisa dibuat dan di-topup.
 - User tanpa kredit cukup tidak bisa start job.
-- Upload kecil selesai.
 - Upload kecil lewat signed URL selesai.
-- Upload di atas `MAX_UPLOAD_MB` ditolak frontend dan backend.
-- Running job cancel mengembalikan kredit estimasi.
+- Job tidak stuck di `queued`.
 - Transcript selesai bisa dibuka.
 - Share link bisa dibuka tanpa login.
 - Export TXT dan SRT jalan.
@@ -570,6 +485,7 @@ Checklist minimal:
 - Session pakai httpOnly cookie.
 - Password di-hash bcrypt.
 - Admin route dijaga `requireAdmin`.
+- Login punya rate limit.
 - Job read/delete/upload/share owner-scoped.
 - Public transcript hanya lewat token yang sulit ditebak.
 - Production upload memakai signed URL ke object storage. Fallback API upload hanya untuk local/dev.
