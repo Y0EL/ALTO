@@ -161,14 +161,14 @@ ALTO/
 
 ## Environment
 
-`.env.example` berisi contoh backend dan frontend sekaligus. Jangan anggap semua variable aktif global. Buat dua file terpisah:
+`.env.example` berisi contoh backend dan frontend sekaligus. Untuk local development boleh copy file ini ke dua tempat, tapi ingat: backend hanya membaca env backend, frontend hanya membaca variable `VITE_*`.
 
 ```powershell
 Copy-Item .env.example backend/.env
 Copy-Item .env.example frontend/.env
 ```
 
-Isi minimal `backend/.env` untuk production mode:
+Isi minimal `backend/.env` untuk staging/production-like mode:
 
 ```bash
 NODE_ENV=staging
@@ -199,6 +199,8 @@ LOGIN_RATE_LIMIT_WINDOW_SEC=900
 DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=change-me-min-8-chars
 ```
+
+Untuk production sebenarnya, ganti `NODE_ENV=production`, `ALLOWED_ORIGINS`, `S3_BUCKET`, `DATABASE_URL`, dan Redis ke resource production. Jangan pakai database atau bucket staging untuk production.
 
 Isi minimal `frontend/.env`:
 
@@ -368,7 +370,7 @@ npm --prefix backend run db:migrate
 
 Pastikan target DB benar. Jangan jalankan migration staging ke database production.
 
-## Staging Production
+## Staging Dan Production
 
 Pisahkan resource staging:
 
@@ -397,7 +399,7 @@ alto-uploads
 Set secret staging:
 
 ```powershell
-fly secrets set `
+fly secrets set -a alto `
   NODE_ENV=staging `
   ALLOWED_ORIGINS=https://your-staging-web `
   MAX_UPLOAD_MB=100 `
@@ -414,6 +416,15 @@ fly secrets set `
   UPSTASH_REDIS_REST_TOKEN=... `
   DEFAULT_ADMIN_USERNAME=admin `
   DEFAULT_ADMIN_PASSWORD=...
+```
+
+Untuk production, pakai value production:
+
+```text
+NODE_ENV=production
+ALLOWED_ORIGINS=https://alto.yoel.online
+S3_BUCKET=alto
+VITE_API_URL=https://alto.fly.dev
 ```
 
 Deploy backend + worker process:
@@ -458,7 +469,14 @@ VITE_API_URL=https://your-staging-api
 VITE_MAX_UPLOAD_MB=100
 ```
 
-Deploy backend dulu, deploy worker, lalu frontend.
+Env frontend production:
+
+```text
+VITE_API_URL=https://alto.fly.dev
+VITE_MAX_UPLOAD_MB=100
+```
+
+Deploy backend dulu, pastikan worker hidup, lalu deploy frontend.
 
 ## Smoke Test Staging
 
