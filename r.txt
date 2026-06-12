@@ -1,0 +1,190 @@
+﻿Rekaman (2).m4a - ALTO Transcript
+ALTO Public Transcript
+Rekaman (2).m4a
+Metadata
+File
+Rekaman (2).m4a
+Durasi
+14m 28d
+Bahasa
+auto
+Jumlah pembicara
+2
+Dibuat
+2026-06-12T07:47:16.550Z
+Ringkasan
+Diskusi dimulai dengan pengenalan dan pengalaman Mas Yoel sebagai AI Engineer selama 3 tahun, termasuk proyek di GSP dan pengalaman sebelumnya di e-commerce dan agensi kreatif.
+Mas Yoel menjelaskan proyek AutoCrawl yang dikembangkan untuk indexing vendor dan penggunaan AI dalam proyek-proyek pemerintah yang bersifat privasi.
+Mas Yoel saat ini sedang mencari kesempatan baru karena proyek terakhirnya telah selesai dan ia sedang beristirahat.
+Perusahaan yang diincar adalah SVOAI, yang bergerak di bidang digital marketing dan ingin mengintegrasikan AI untuk meningkatkan efisiensi sistem.
+Mas Yoel menyatakan ekspektasi gaji di atas 12.500.000 dan bersedia untuk probation dengan gaji tersebut, serta siap untuk mengikuti tes yang akan diberikan.
+Transkrip
+[0:01 - 0:02] Speaker 1
+Halo,
+[0:04 - 0:05] Speaker 2
+selamat siang.
+[0:05 - 0:07] Speaker 1
+Halo, selamat siang Ka.
+[0:07 - 0:12] Speaker 2
+Iya dengan hasil Andre. Sebenernya
+[0:26 - 0:37] Speaker 2
+Saya kayaknya ingin tayang sedikit aja sih Mas sebentar sekitar 510 menit untuk mengkonfirmasi kendaraannya Mas Yowel nih Mas Kita mulai ya Mas ya
+[0:38 - 0:38] Speaker 1
+Oke boleh
+[0:40 - 0:54] Speaker 2
+oke baik boleh dimulai dengan ceritakan mungkin dari pengalamannya Mas Yoel sebagai AI Engineer terus kemudian perusahaan yang terakhir ini posisi dan bergerak dibidang ke18?
+[0:56 - 2:31] Speaker 1
+Baiklah, terimakasih ya kak atas kesempatannya pengalaman aku di AI Engineer itu ada di 3 tahun terakhir dan di 1 tahun terakhir ini tuh ada di GSP perusahaan yang bergerak dibidang pertahanan dan keamanan negara aku disana jadi full stack AI Engineer forward deployed untuk projectproject seperti di bandPT dan juga di Bareskrim lalu di dua perusahaan terakhir aku bergerak di bagian ecommerce lalu di yang satu lagi ada di Commercial atau yang Content Creative Digital Agency lalu yang terakhir ini di GSP aku ngebangun AutoCrawl AutoCrawl itu aplikasi untuk indexing vendor yang jalan otomatis 100% itu di environmentnya perusahaan jadi aku udah terbiasa banget sama endtoend Python untuk production Aku harus make sure kalau integrasi antara vendor dan juga perusahaan itu selalu terhubung lewat arsitektur lonceng lalu kru.AI sama MCV server dari listlist vendor yang udah dikumpulkan kirakira pengalaman aku di sekitar tiga tahun dan di tahuntahun terakhir ini aku ngabisin di badai es krim Kak kirakira begitu
+[2:38 - 3:37] Speaker 1
+Maaf Kak, kepotong suaranya. Untuk yang di bar es krim sama di BINPT ini kan memang termasuk projectproject privasi untuk negara ya jadi aku ini sebenarnya implementasi tuh dua kali yang pertama ini yang pasti local model untuk mereka dan yang kedua ini API dari luar seperti Gemini, Cloud, sama yang pasti ChatGPT karena tiga itu yang paling digunakan disana dan kita pakai sistem Sandboxing jadi kalaupun data yang mau dikirim ke Cloud itu harus lewat model yang ada diluar bukan local model kita pakai di sandbox jadi datanya ga keluar dari environment bareskrim ataupun BNPT tapi tetep kita bisa calling API ke AI yang di luar gitu jadi ga nutup kemungkinan kalau ini tuh bisa pakai AI yang di luar begitu sih kak
+[3:38 - 3:45] Speaker 2
+Oke oke. Perusahaan yang sekarang dimana Mas? Lokasinya yang kantornya
+[3:45 - 3:53] Speaker 1
+yang terakhir sih ada di deket Tangerang ya mau deketdeket ke BSD di jalan Arumi seingat aku
+[3:55 - 3:56] Speaker 2
+oke, full WFO?
+[3:58 - 3:59] Speaker 1
+Iya, saya full WFO disana
+[4:01 - 4:06] Speaker 2
+gapapa oke nah alasannya ingin cari New Opportunity apa nih Mas?
+[4:08 - 4:22] Speaker 1
+Sebenarnya bukan New Opportunity ya kak tapi memang projectnya kan sudah selesai dan aku memang gak di calling back gitu karena projectnya udah finish jadi aku sampai sekarang masih Idol begitu
+[4:24 - 4:30] Speaker 2
+Oke tapi sampai saat ini statusnya seperti apa nih mas? Sudah selesai kontraknya gitu ya?
+[4:30 - 4:44] Speaker 1
+Iya kontrak sudah selesai dan aku memutuskan untuk rehat dulu sih Kak dari yang sebelumnya gitu karena udah deployment sampai keluar kota juga kan kita jadi memang butuh break dan ini sudah jalan satu minggu gitu
+[4:49 - 4:51] Speaker 2
+atau untuk domisili sendiri dimana Mas?
+[4:52 - 4:56] Speaker 1
+Kalau aku ada di Pinjaringan, Pluit Pinjaringan di Jakarta Utara
+[5:02 - 5:05] Speaker 2
+saat ini ada di posisi lagi di rumah nih mas?
+[5:05 - 5:07] Speaker 1
+Iya betul lagi di rumah kak
+[5:09 - 5:14] Speaker 2
+Nah untuk posisi terakhir kemarin itu ada timnya atau bekerja sendiri Mas?
+[5:15 - 5:44] Speaker 1
+Untuk yang terakhir itu sebenarnya tim tapi itu kan dibagi ya kak, kalau untuk AutoCroll itu saya sendiri tapi untuk yang BNPT ini untuk tim besar gitu jadi kita kebagian untuk ngebuat arsitekturnya aja sementara yang melakukan pengkodean itu dari tim lain dari vendor tapi untuk yang Auto Crowl sama untuk yang di BADAS KREAM itu project didedikasikan untuk saya begitu sih kak
+[5:44 - 5:45] Speaker 2
+oke
+[5:48 - 5:49] Speaker 2
+oke oke
+[5:52 - 6:09] Speaker 2
+oke oke selanjutnya mungkin aku jelasin sedikit ya mas ya tentang SVOAI nanti untuk detail teknisnya untuk lebih ke jurusan ya mas ya aku mau jelasin sedikit tentang SFO itu sendiri sebenernya kita ini lebih ke Digital Marketing dari punya
+[6:12 - 9:34] Speaker 2
+jadi gini, studio itu awalnya dari Malaysia cuman kita keberhasilan kita membawa dari Malaysia ke Indonesia seperti itu nah produk yang dijualkan apa? Produk yang dijualkan itu adalah produknya ptwouse yang ada di Malaysia juga yaitu berbentuk multivitamin, suplemen seperti itu nah jadi tugas SW adalah marketingnya atau pengasarannya nah disini banyak dealerdealer atau distributor bisnis yang menjual itu semua jadi dealerdealer disini tuh kurang lebih ada sekitar 20an sampai 30an dengan menjual produk yang sama tapi cara pemasarannya aja yang berbedabeda dari boleh kontennya mungkin atau sisi kreatifnya lah ya untuk jualannya sendiri kita tidak di capers tapi lebih ke website terus langsung ke whatsapp gitu jadi mainnya memang di peta ads seperti itu nah untuk sistem kerjanya sendiri sebenarnya sudah ada Mas Butrain AI Engineer ini karena memang kita sedang apa ya istilahnya sekarang kita sudah beralih ke AI ya semuanya, kayak kontenkonten, kontenkonten, begitu, benchmark, scripting dan sebagainya itu udah pakai AI semua cuma lebih ke kita pengen benerin flow atau sistemnya kita nih yang mungkin masih manual terus kemudian gimana caranya si AI engineer ini membuat AI agent lah biar sistem kita tuh sebagai inter automasi seperti itu, jadi untuk dealerdilernya yang mau bergabung pun lebih enak lah ya untuk flownya oh oke flownya tinggal seperti ini, seperti ini jadi lebih memudahkan untuk mereka bisa berjualannya segera karena kalau misalkan saat ini kan kita diajarkan gitu ya kak ya tapi memang posisinya diajarin secara manual entah bikin landing pagenya yang mungkin masih manual atau tips and trick bikin kontennya masih manual tapi ini semua pengen kita buat jadi satu gitu jadi ada AI agent nya oh ya udah lo kalau gak salah bikin konten ini nih ininya, nemenin ininya dan ini soalnya seperti itu kayak gitu saat ini saya informasiin dari awal kalau kita full EF kok ya Mas jadi memang kita Hybrid high grade atau remote sejauh ini yang saya terima informasinya seperti itu nantinya untuk timnya sendiri belum ada karena memang kita baru ide ini baru muncul dari salah satu dealer kita yang memang dia itu buka course atau ahlinya ChatGPT lah dia bikin kelas belajar ChatGPT dan ide AI Engineer ini memang idenya beliau supaya apa? Supaya sistem kerja atau flownya itu lebih smooth lagi gimana caranya biar lebih terautomate otomatis aja gitu jadi lebih efisien lah ya cara kerjanya seperti itu tapi memang fokusnya alaala pastinya itu untuk kebutuhan kebutuhan sales kita seperti itu kalau untuk chatbot sebenernya udah lama pakai chatbot cuman ada yang masih pakai sorry ada yang masih manual masih menggoda ke CS ada yang memang dia sudah full chatbot ada yang dicampur juga dan sebagainya. Seperti institusi kurang lebih mask, ntar kita di Palmerah Jakarta Barat seharusnya aku udah rumah Mas Yural gak begitu jauh sih, di Penjaringanan situ ya?
+[9:35 - 9:36] Speaker 1
+Iya, deket itu kak?
+[9:38 - 9:43] Speaker 2
+Seperti ieitu mas Hilellan ini ditanyakan dulu sebelum kita lanjut
+[9:43 - 10:01] Speaker 1
+oke aku paham soal use case yang ada di yang ada di sana jadi nanti aku akan buat auto matching gitu untuk membuat itu semakin efisien ya yang semuanya kan masih pada manual gitu ya, by yang manual tapi ada yang ada yang dicampurcampur juga tadi yang kakak bilang dan nanti kalaupun aku bergabung
+[10:01 - 10:25] Speaker 2
+saat ini sih kakak bilang dan nanti kalaupun aku bergabung saat ini sih kebanyakan dealerdealer kita itu udah banyak banget yang mereka pakai AI untuk membuat landing page, konten dan sebagainya mereka udah promunting sendiri atau artikel cloud sendiri dan sebagainya sih ya gitu cuman ini mungkin lebih ke ke untuk new dealer, kayak mengajarkan bahwa oh semudah gitu loh, jadi don't worry gitu. Atau mungkin bagi mereka yang ingin efisiensi tim,
+[10:31 - 10:32] Speaker 1
+boleh dilanjut kak?
+[10:35 - 10:38] Speaker 2
+Heeh udah sih pak, seperti itu sih mas kurang lebih
+[10:39 - 10:46] Speaker 1
+Kalo begitu apa nanti kirakira ada tes untuk saya biar saya bisa langsung Show casing.
+[10:46 - 10:56] Speaker 2
+Oh, I see. Cukup. Oke oke. Sebelum lanjut ke situ saya mau tanya dulu sedikit nih mas Untuk saat ini mas Yoel usianya berapa tahun mas?
+[10:57 - 10:59] Speaker 1
+Aku ditahun ini nginjak ke 22 tahun
+[11:01 - 11:05] Speaker 2
+kak 22 tahun? Oke lulusan mana mas sorry?
+[11:05 - 11:24] Speaker 1
+Sepertinya aku kuliahnya masih di hold kak karena kepentingan keluar kota tadi jadi aku sengaja untuk hold aku kuliahnya fully online dari luar karena jamnya juga enggak sesuai sama kita maka dari itu aku mutusin buat di pos dulu kuliahnya Seriusin dulu yang di sini begitu
+[11:25 - 11:29] Speaker 2
+Oh gitu tapi ada keinginan untuk lanjut?
+[11:30 - 11:42] Speaker 1
+Kalau keinginan untuk lanjut pasti ada dan aku pasti akan nunggu timing yang tepat karena waktunya itu benerbener di tengah malam dan aku seringkali tuh sering kelewatan begitu sih kak
+[11:50 - 11:59] Speaker 2
+Kalo untuk domisili tadi di pencjaringanan ya mungkin berarti saat ini tinggal dengan keluarga?
+[12:01 - 12:12] Speaker 1
+Enggak, aku kos di penjingan kalau rumahku aslinya di Penambangan di Jakarta Tara deket Ancol itu rumah aku tapi kalau untuk sekarang aku ngekos di penjarin
+[12:14 - 12:15] Speaker 2
+Oh gitu,
+[12:15 - 12:16] Speaker 1
+rumah di
+[12:16 - 12:17] Speaker 2
+Jakarta tapi ngekos di Jakarta juga
+[12:17 - 12:19] Speaker 1
+ya? Iya betul betul
+[12:20 - 12:24] Speaker 2
+karena transportasi lumayan sih ya mobilitas kita oke
+[12:26 - 12:27] Speaker 2
+terus untuk
+[12:29 - 12:32] Speaker 2
+join dive berarti bisa segera ya mas ya?
+[12:32 - 12:34] Speaker 1
+Betul betul bisa kak
+[12:37 - 12:43] Speaker 2
+sekarang aku mau tanya lessary mas Yool kemudian ekspektasinya di atas berapa
+[12:44 - 13:24] Speaker 1
+atas berapa mas? Kalau untuk upah kerja terakhir di perusahaan terakhir sih aku bersih di 12.500.000 namun kalau kita bicara ekspektasi ya naik 500 atau naik 1 juta itu ekspektasi aku kak di 13 ataupun di 13500 begitu itu ekspektasi dari aku tapi kalau ada kalau tim butuh penilaian dulu dari aku gitu kalau aku masih probation itu boleh banget aku taruh di 12.500 setelah probation mungkin aku akan bicara lagi sama kakak terkait itu pa kerja kalau itu jadi pertimbangan gitu sih kak
+[13:26 - 14:11] Speaker 2
+Oke oke oke oke kemudian pembagian jalan saya sih cukup sampai itu dulu nih pertanyaan ya karena nanti untuk detailnya akan diuser namun sebelum kita sampai ke user interview akan ada tes dulu nih dari usernya untuk melihat bagaimana nih untuk hasil testnya apakah memang sesuai dengan apa yang tidak cari atau tidak, gitu mas nah untuk nanti tesnya akan saya kirimkan melalui whatsapp jadi nanti boleh dikembalikan atau jawabannya boleh dikirim kembali melalui WhatsApp kalau lihat lainnya itu empat hari kerja silahkan dikerjakan apabila ada yang ingin ditanyakan boleh ditanyakan by WhatsApp juga melalui saya nanti saya tanyakan ke usernya seperti itu
+[14:11 - 14:13] Speaker 1
+oke oke Kak
+[14:14 - 14:24] Speaker 2
+Oke baik terima kasih banyak Reel atas Kak ditanya untuk interview hari ini nanti saya kirimkan khasnya Thank you selamat siang
+[14:24 - 14:27] Speaker 1
+baiklah Terimakasih kak selamat siang
+Plain Text Transcript
+[0:01 - 0:02] Speaker 1: Halo,
+[0:04 - 0:05] Speaker 2: selamat siang.
+[0:05 - 0:07] Speaker 1: Halo, selamat siang Ka.
+[0:07 - 0:12] Speaker 2: Iya dengan hasil Andre. Sebenernya
+[0:26 - 0:37] Speaker 2: Saya kayaknya ingin tayang sedikit aja sih Mas sebentar sekitar 510 menit untuk mengkonfirmasi kendaraannya Mas Yowel nih Mas Kita mulai ya Mas ya
+[0:38 - 0:38] Speaker 1: Oke boleh
+[0:40 - 0:54] Speaker 2: oke baik boleh dimulai dengan ceritakan mungkin dari pengalamannya Mas Yoel sebagai AI Engineer terus kemudian perusahaan yang terakhir ini posisi dan bergerak dibidang ke18?
+[0:56 - 2:31] Speaker 1: Baiklah, terimakasih ya kak atas kesempatannya pengalaman aku di AI Engineer itu ada di 3 tahun terakhir dan di 1 tahun terakhir ini tuh ada di GSP perusahaan yang bergerak dibidang pertahanan dan keamanan negara aku disana jadi full stack AI Engineer forward deployed untuk projectproject seperti di bandPT dan juga di Bareskrim lalu di dua perusahaan terakhir aku bergerak di bagian ecommerce lalu di yang satu lagi ada di Commercial atau yang Content Creative Digital Agency lalu yang terakhir ini di GSP aku ngebangun AutoCrawl AutoCrawl itu aplikasi untuk indexing vendor yang jalan otomatis 100% itu di environmentnya perusahaan jadi aku udah terbiasa banget sama endtoend Python untuk production Aku harus make sure kalau integrasi antara vendor dan juga perusahaan itu selalu terhubung lewat arsitektur lonceng lalu kru.AI sama MCV server dari listlist vendor yang udah dikumpulkan kirakira pengalaman aku di sekitar tiga tahun dan di tahuntahun terakhir ini aku ngabisin di badai es krim Kak kirakira begitu
+[2:38 - 3:37] Speaker 1: Maaf Kak, kepotong suaranya. Untuk yang di bar es krim sama di BINPT ini kan memang termasuk projectproject privasi untuk negara ya jadi aku ini sebenarnya implementasi tuh dua kali yang pertama ini yang pasti local model untuk mereka dan yang kedua ini API dari luar seperti Gemini, Cloud, sama yang pasti ChatGPT karena tiga itu yang paling digunakan disana dan kita pakai sistem Sandboxing jadi kalaupun data yang mau dikirim ke Cloud itu harus lewat model yang ada diluar bukan local model kita pakai di sandbox jadi datanya ga keluar dari environment bareskrim ataupun BNPT tapi tetep kita bisa calling API ke AI yang di luar gitu jadi ga nutup kemungkinan kalau ini tuh bisa pakai AI yang di luar begitu sih kak
+[3:38 - 3:45] Speaker 2: Oke oke. Perusahaan yang sekarang dimana Mas? Lokasinya yang kantornya
+[3:45 - 3:53] Speaker 1: yang terakhir sih ada di deket Tangerang ya mau deketdeket ke BSD di jalan Arumi seingat aku
+[3:55 - 3:56] Speaker 2: oke, full WFO?
+[3:58 - 3:59] Speaker 1: Iya, saya full WFO disana
+[4:01 - 4:06] Speaker 2: gapapa oke nah alasannya ingin cari New Opportunity apa nih Mas?
+[4:08 - 4:22] Speaker 1: Sebenarnya bukan New Opportunity ya kak tapi memang projectnya kan sudah selesai dan aku memang gak di calling back gitu karena projectnya udah finish jadi aku sampai sekarang masih Idol begitu
+[4:24 - 4:30] Speaker 2: Oke tapi sampai saat ini statusnya seperti apa nih mas? Sudah selesai kontraknya gitu ya?
+[4:30 - 4:44] Speaker 1: Iya kontrak sudah selesai dan aku memutuskan untuk rehat dulu sih Kak dari yang sebelumnya gitu karena udah deployment sampai keluar kota juga kan kita jadi memang butuh break dan ini sudah jalan satu minggu gitu
+[4:49 - 4:51] Speaker 2: atau untuk domisili sendiri dimana Mas?
+[4:52 - 4:56] Speaker 1: Kalau aku ada di Pinjaringan, Pluit Pinjaringan di Jakarta Utara
+[5:02 - 5:05] Speaker 2: saat ini ada di posisi lagi di rumah nih mas?
+[5:05 - 5:07] Speaker 1: Iya betul lagi di rumah kak
+[5:09 - 5:14] Speaker 2: Nah untuk posisi terakhir kemarin itu ada timnya atau bekerja sendiri Mas?
+[5:15 - 5:44] Speaker 1: Untuk yang terakhir itu sebenarnya tim tapi itu kan dibagi ya kak, kalau untuk AutoCroll itu saya sendiri tapi untuk yang BNPT ini untuk tim besar gitu jadi kita kebagian untuk ngebuat arsitekturnya aja sementara yang melakukan pengkodean itu dari tim lain dari vendor tapi untuk yang Auto Crowl sama untuk yang di BADAS KREAM itu project didedikasikan untuk saya begitu sih kak
+[5:44 - 5:45] Speaker 2: oke
+[5:48 - 5:49] Speaker 2: oke oke
+[5:52 - 6:09] Speaker 2: oke oke selanjutnya mungkin aku jelasin sedikit ya mas ya tentang SVOAI nanti untuk detail teknisnya untuk lebih ke jurusan ya mas ya aku mau jelasin sedikit tentang SFO itu sendiri sebenernya kita ini lebih ke Digital Marketing dari punya
+[6:12 - 9:34] Speaker 2: jadi gini, studio itu awalnya dari Malaysia cuman kita keberhasilan kita membawa dari Malaysia ke Indonesia seperti itu nah produk yang dijualkan apa? Produk yang dijualkan itu adalah produknya ptwouse yang ada di Malaysia juga yaitu berbentuk multivitamin, suplemen seperti itu nah jadi tugas SW adalah marketingnya atau pengasarannya nah disini banyak dealerdealer atau distributor bisnis yang menjual itu semua jadi dealerdealer disini tuh kurang lebih ada sekitar 20an sampai 30an dengan menjual produk yang sama tapi cara pemasarannya aja yang berbedabeda dari boleh kontennya mungkin atau sisi kreatifnya lah ya untuk jualannya sendiri kita tidak di capers tapi lebih ke website terus langsung ke whatsapp gitu jadi mainnya memang di peta ads seperti itu nah untuk sistem kerjanya sendiri sebenarnya sudah ada Mas Butrain AI Engineer ini karena memang kita sedang apa ya istilahnya sekarang kita sudah beralih ke AI ya semuanya, kayak kontenkonten, kontenkonten, begitu, benchmark, scripting dan sebagainya itu udah pakai AI semua cuma lebih ke kita pengen benerin flow atau sistemnya kita nih yang mungkin masih manual terus kemudian gimana caranya si AI engineer ini membuat AI agent lah biar sistem kita tuh sebagai inter automasi seperti itu, jadi untuk dealerdilernya yang mau bergabung pun lebih enak lah ya untuk flownya oh oke flownya tinggal seperti ini, seperti ini jadi lebih memudahkan untuk mereka bisa berjualannya segera karena kalau misalkan saat ini kan kita diajarkan gitu ya kak ya tapi memang posisinya diajarin secara manual entah bikin landing pagenya yang mungkin masih manual atau tips and trick bikin kontennya masih manual tapi ini semua pengen kita buat jadi satu gitu jadi ada AI agent nya oh ya udah lo kalau gak salah bikin konten ini nih ininya, nemenin ininya dan ini soalnya seperti itu kayak gitu saat ini saya informasiin dari awal kalau kita full EF kok ya Mas jadi memang kita Hybrid high grade atau remote sejauh ini yang saya terima informasinya seperti itu nantinya untuk timnya sendiri belum ada karena memang kita baru ide ini baru muncul dari salah satu dealer kita yang memang dia itu buka course atau ahlinya ChatGPT lah dia bikin kelas belajar ChatGPT dan ide AI Engineer ini memang idenya beliau supaya apa? Supaya sistem kerja atau flownya itu lebih smooth lagi gimana caranya biar lebih terautomate otomatis aja gitu jadi lebih efisien lah ya cara kerjanya seperti itu tapi memang fokusnya alaala pastinya itu untuk kebutuhan kebutuhan sales kita seperti itu kalau untuk chatbot sebenernya udah lama pakai chatbot cuman ada yang masih pakai sorry ada yang masih manual masih menggoda ke CS ada yang memang dia sudah full chatbot ada yang dicampur juga dan sebagainya. Seperti institusi kurang lebih mask, ntar kita di Palmerah Jakarta Barat seharusnya aku udah rumah Mas Yural gak begitu jauh sih, di Penjaringanan situ ya?
+[9:35 - 9:36] Speaker 1: Iya, deket itu kak?
+[9:38 - 9:43] Speaker 2: Seperti ieitu mas Hilellan ini ditanyakan dulu sebelum kita lanjut
+[9:43 - 10:01] Speaker 1: oke aku paham soal use case yang ada di yang ada di sana jadi nanti aku akan buat auto matching gitu untuk membuat itu semakin efisien ya yang semuanya kan masih pada manual gitu ya, by yang manual tapi ada yang ada yang dicampurcampur juga tadi yang kakak bilang dan nanti kalaupun aku bergabung
+[10:01 - 10:25] Speaker 2: saat ini sih kakak bilang dan nanti kalaupun aku bergabung saat ini sih kebanyakan dealerdealer kita itu udah banyak banget yang mereka pakai AI untuk membuat landing page, konten dan sebagainya mereka udah promunting sendiri atau artikel cloud sendiri dan sebagainya sih ya gitu cuman ini mungkin lebih ke ke untuk new dealer, kayak mengajarkan bahwa oh semudah gitu loh, jadi don't worry gitu. Atau mungkin bagi mereka yang ingin efisiensi tim,
+[10:31 - 10:32] Speaker 1: boleh dilanjut kak?
+[10:35 - 10:38] Speaker 2: Heeh udah sih pak, seperti itu sih mas kurang lebih
+[10:39 - 10:46] Speaker 1: Kalo begitu apa nanti kirakira ada tes untuk saya biar saya bisa langsung Show casing.
+[10:46 - 10:56] Speaker 2: Oh, I see. Cukup. Oke oke. Sebelum lanjut ke situ saya mau tanya dulu sedikit nih mas Untuk saat ini mas Yoel usianya berapa tahun mas?
+[10:57 - 10:59] Speaker 1: Aku ditahun ini nginjak ke 22 tahun
+[11:01 - 11:05] Speaker 2: kak 22 tahun? Oke lulusan mana mas sorry?
+[11:05 - 11:24] Speaker 1: Sepertinya aku kuliahnya masih di hold kak karena kepentingan keluar kota tadi jadi aku sengaja untuk hold aku kuliahnya fully online dari luar karena jamnya juga enggak sesuai sama kita maka dari itu aku mutusin buat di pos dulu kuliahnya Seriusin dulu yang di sini begitu
+[11:25 - 11:29] Speaker 2: Oh gitu tapi ada keinginan untuk lanjut?
+[11:30 - 11:42] Speaker 1: Kalau keinginan untuk lanjut pasti ada dan aku pasti akan nunggu timing yang tepat karena waktunya itu benerbener di tengah malam dan aku seringkali tuh sering kelewatan begitu sih kak
+[11:50 - 11:59] Speaker 2: Kalo untuk domisili tadi di pencjaringanan ya mungkin berarti saat ini tinggal dengan keluarga?
+[12:01 - 12:12] Speaker 1: Enggak, aku kos di penjingan kalau rumahku aslinya di Penambangan di Jakarta Tara deket Ancol itu rumah aku tapi kalau untuk sekarang aku ngekos di penjarin
+[12:14 - 12:15] Speaker 2: Oh gitu,
+[12:15 - 12:16] Speaker 1: rumah di
+[12:16 - 12:17] Speaker 2: Jakarta tapi ngekos di Jakarta juga
+[12:17 - 12:19] Speaker 1: ya? Iya betul betul
+[12:20 - 12:24] Speaker 2: karena transportasi lumayan sih ya mobilitas kita oke
+[12:26 - 12:27] Speaker 2: terus untuk
+[12:29 - 12:32] Speaker 2: join dive berarti bisa segera ya mas ya?
+[12:32 - 12:34] Speaker 1: Betul betul bisa kak
+[12:37 - 12:43] Speaker 2: sekarang aku mau tanya lessary mas Yool kemudian ekspektasinya di atas berapa
+[12:44 - 13:24] Speaker 1: atas berapa mas? Kalau untuk upah kerja terakhir di perusahaan terakhir sih aku bersih di 12.500.000 namun kalau kita bicara ekspektasi ya naik 500 atau naik 1 juta itu ekspektasi aku kak di 13 ataupun di 13500 begitu itu ekspektasi dari aku tapi kalau ada kalau tim butuh penilaian dulu dari aku gitu kalau aku masih probation itu boleh banget aku taruh di 12.500 setelah probation mungkin aku akan bicara lagi sama kakak terkait itu pa kerja kalau itu jadi pertimbangan gitu sih kak
+[13:26 - 14:11] Speaker 2: Oke oke oke oke kemudian pembagian jalan saya sih cukup sampai itu dulu nih pertanyaan ya karena nanti untuk detailnya akan diuser namun sebelum kita sampai ke user interview akan ada tes dulu nih dari usernya untuk melihat bagaimana nih untuk hasil testnya apakah memang sesuai dengan apa yang tidak cari atau tidak, gitu mas nah untuk nanti tesnya akan saya kirimkan melalui whatsapp jadi nanti boleh dikembalikan atau jawabannya boleh dikirim kembali melalui WhatsApp kalau lihat lainnya itu empat hari kerja silahkan dikerjakan apabila ada yang ingin ditanyakan boleh ditanyakan by WhatsApp juga melalui saya nanti saya tanyakan ke usernya seperti itu
+[14:11 - 14:13] Speaker 1: oke oke Kak
+[14:14 - 14:24] Speaker 2: Oke baik terima kasih banyak Reel atas Kak ditanya untuk interview hari ini nanti saya kirimkan khasnya Thank you selamat siang
+[14:24 - 14:27] Speaker 1: baiklah Terimakasih kak selamat siang

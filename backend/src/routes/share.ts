@@ -32,9 +32,6 @@ shareRouter.get('/:token', async (c) => {
 
   const summary = transcript.summary?.trim()
   const segments = transcript.segments ?? []
-  const plainTranscript = segments
-    .map((segment) => `[${segment.start} - ${segment.end}] ${segment.speaker}: ${segment.text}`)
-    .join('\n')
 
   return c.html(renderPage({
     title,
@@ -73,10 +70,6 @@ shareRouter.get('/:token', async (c) => {
         `).join('\n')}
       </section>
 
-      <section>
-        <h2>Plain Text Transcript</h2>
-        <pre>${escapeHtml(plainTranscript)}</pre>
-      </section>
     `,
   }))
 })
