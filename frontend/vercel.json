@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/share/:token",
+      "destination": "https://alto.fly.dev/share/:token"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

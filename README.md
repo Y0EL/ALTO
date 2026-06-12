@@ -98,7 +98,7 @@ flowchart TB
 | Transkrip | Speaker label, timestamp, punctuation, smart formatting |
 | Ringkasan | Summary meeting via OpenAI |
 | Export | Copy semua, copy segmen, TXT, SRT |
-| Share | Link publik `/share/:token` tanpa login |
+| Share | Link publik `/share/:token` tanpa login, dirender sebagai HTML agar readable oleh AI/crawler |
 | Mobile | UI mobile-first dengan PWA build |
 
 ## Production Readiness
@@ -335,6 +335,8 @@ Orang tanpa login bisa melihat transcript melalui:
 ```text
 GET /jobs/shared/:token
 ```
+
+Untuk AI/crawler, URL publik `/share/:token` dirender backend sebagai HTML berisi metadata, ringkasan, dan transkrip lengkap. Frontend hosting harus rewrite `/share/:token` ke backend `/share/:token`; di Vercel config ini sudah ada di `vercel.json`.
 
 ## API Ringkas
 

@@ -16,6 +16,7 @@ import { authRouter } from './routes/auth.js'
 import { usersRouter } from './routes/users.js'
 import { jobsRouter } from './routes/jobs.js'
 import { uploadRouter } from './routes/upload.js'
+import { shareRouter } from './routes/share.js'
 import { db } from './db/client.js'
 import { jobs } from './db/schema.js'
 import { inArray, sql } from 'drizzle-orm'
@@ -116,6 +117,7 @@ app.route('/auth', authRouter)
 app.route('/users', usersRouter)
 app.route('/jobs', jobsRouter)
 app.route('/upload', uploadRouter)
+app.route('/share', shareRouter)
 
 app.onError((err, c) => {
   console.error('Unhandled error:', err)
